@@ -1,0 +1,22 @@
+{
+  "name": "@autolayer/monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm build:packages && pnpm --filter @autolayer/api dev",
+    "build": "pnpm -r run build",
+    "build:api": "pnpm --filter @autolayer/api build",
+    "build:sdk": "pnpm --filter @autolayer/sdk build",
+    "test": "pnpm -r --if-present run test",
+    "lint": "pnpm -r --if-present run lint",
+    "migrate": "pnpm --filter @autolayer/api migrate",
+    "start": "pnpm --filter @autolayer/api start",
+    "pack:sdk": "pnpm --filter @autolayer/sdk pack",
+    "build:packages": "pnpm --filter @autolayer/shared build && pnpm --filter @autolayer/crypto build && pnpm --filter @autolayer/sdk build"
+  }
+}

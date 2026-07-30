@@ -1,0 +1,135 @@
+# ======================================================
+# AutoLayer
+# ======================================================
+
+# Dependencies
+node_modules/
+.pnpm-store/
+.npm/
+
+# Builds
+dist/
+build/
+coverage/
+.out/
+tmp/
+temp/
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.orig
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Turborepo
+.turbo/
+
+# Nx
+.nx/
+
+# Cache
+.cache/
+.eslintcache
+
+# Test output
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Jest
+jest-html-reporters-*
+
+# Docker
+docker-compose.override.yml
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
+
+# PostgreSQL dumps
+*.sql
+*.dump
+
+# Certificates / Keys
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Soroban / Stellar secrets
+identity/
+stellar-identity/
+soroban-identity/
+*.secret
+*.seed
+
+# Local generated artifacts
+generated/
+generated-workflows/
+artifacts/
+uploads/
+
+# Package archives
+*.tgz
+
+# Misc
+*.bak
+*.tmp
+
+# dotenv vault
+.env.vault
+
+# Vercel
+.vercel/
+
+# Netlify
+.netlify/
+
+# AWS
+.aws-sam/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Local CLI configs
+.history/

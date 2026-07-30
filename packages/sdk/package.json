@@ -1,0 +1,31 @@
+{
+  "name": "@autolayer/sdk",
+  "version": "1.0.0",
+  "description": "TypeScript client SDK for AutoLayer automation proposals, x402 payments, activation and lifecycle management.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.15",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

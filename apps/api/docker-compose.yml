@@ -1,0 +1,35 @@
+# Convenience compose file. Run from apps/api with: docker compose up --build
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: autolayer
+      POSTGRES_PASSWORD: autolayer
+      POSTGRES_DB: autolayer
+    ports:
+      - "5434:5432"
+    volumes:
+      - autolayer_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autolayer -d autolayer"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  autolayer:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: postgresql://autolayer:autolayer@postgres:5432/autolayer
+    ports:
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "pnpm migrate && pnpm start"
+
+volumes:
+  autolayer_pg:
