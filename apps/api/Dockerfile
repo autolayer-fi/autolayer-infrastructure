@@ -7,8 +7,6 @@ COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/api/package.json ./apps/api/package.json
 RUN pnpm install --no-frozen-lockfile
 COPY apps/api ./apps/api
-RUN pnpm --filter @autolayer/api... build
-RUN pnpm deploy --filter @autolayer/api --prod /prod/api
 
 FROM node:20-alpine
 WORKDIR /app
