@@ -12,7 +12,6 @@ RUN pnpm build
 FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=build /prod/api ./
 COPY --from=build /app/apps/api/dist ./dist
 EXPOSE 5001
 CMD ["node", "dist/index.js"]
