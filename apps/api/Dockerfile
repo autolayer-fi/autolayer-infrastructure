@@ -13,5 +13,8 @@ FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/apps/api/dist ./dist
+COPY apps/api/package.json ./
+RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
+RUN pnpm install --prod --no-frozen-lockfile
 EXPOSE 5001
 CMD ["node", "dist/index.js"]
