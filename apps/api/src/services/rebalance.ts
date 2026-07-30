@@ -246,8 +246,8 @@ export async function buildAquariusRebalancePlan(input: {
   const analysis: RebalanceAnalysis = {
     ...baseAnalysis,
     positions,
-    overweightAsset: overweight?.asset,
-    underweightAsset: underweight?.asset,
+    ...(overweight && { overweightAsset: overweight.asset }),
+    ...(underweight && { underweightAsset: underweight.asset }),
   };
 
   if (!overweight || !underweight || overweight.asset === underweight.asset) {
