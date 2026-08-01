@@ -1,7 +1,7 @@
 {
   "name": "@autolayer/sdk",
-  "version": "1.0.0",
-  "description": "TypeScript client SDK for AutoLayer automation proposals, x402 payments, activation and lifecycle management.",
+  "version": "0.1.0",
+  "description": "TypeScript runtime for deterministic financial automation, authorization, and execution on Stellar.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
