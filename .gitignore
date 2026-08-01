@@ -84,7 +84,7 @@ docker-compose.override.yml
 *.db
 
 # PostgreSQL dumps
-*.sql
+
 *.dump
 
 # Certificates / Keys
