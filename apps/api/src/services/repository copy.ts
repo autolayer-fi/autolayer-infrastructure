@@ -1,6 +1,5 @@
-import { Buffer } from "node:buffer";
 import { pool } from "../db/pool.js";
-import type { Automation, Network } from "../api/types.js";
+import type { Automation } from "../api/types.js";
 
 function encrypted(row: any, prefix: string) {
   return {
@@ -9,12 +8,6 @@ function encrypted(row: any, prefix: string) {
     tag: String(row[`${prefix}_tag`]),
     version: Number(row.encryption_version),
   };
-}
-
-function nullableDate(value: unknown): Date | null {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(String(value));
-  return Number.isFinite(date.getTime()) ? date : null;
 }
 
 function toAutomation(row: any): Automation {
@@ -49,57 +42,14 @@ function toAutomation(row: any): Automation {
     paymentQuoteExpiresAt: new Date(row.payment_quote_expires_at),
     paymentTxHash: row.payment_tx_hash,
     paymentPayer: row.payment_payer,
-    nextRunAt: nullableDate(row.next_run_at),
-    lastRunAt: nullableDate(row.last_run_at),
-    lastFinishedAt: nullableDate(row.last_finished_at),
-    createdAt: nullableDate(row.created_at),
-    updatedAt: nullableDate(row.updated_at),
-    activatedAt: nullableDate(row.activated_at),
-    revokedAt: nullableDate(row.revoked_at),
-    lastError: row.last_error ?? null,
   };
-}
-
-export interface AutomationCursor {
-  createdAt: string;
-  id: string;
-}
-
-export interface AutomationPage {
-  items: Automation[];
-  nextCursor: string | null;
-}
-
-export function encodeAutomationCursor(cursor: AutomationCursor): string {
-  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
-}
-
-export function decodeAutomationCursor(value: string): AutomationCursor {
-  try {
-    const parsed = JSON.parse(
-      Buffer.from(value, "base64url").toString("utf8")
-    ) as Partial<AutomationCursor>;
-
-    if (!parsed.id || !parsed.createdAt) {
-      throw new Error("cursor is missing fields");
-    }
-
-    const date = new Date(parsed.createdAt);
-    if (!Number.isFinite(date.getTime())) {
-      throw new Error("cursor contains an invalid date");
-    }
-
-    return { id: String(parsed.id), createdAt: date.toISOString() };
-  } catch {
-    throw new Error("Invalid pagination cursor");
-  }
 }
 
 export interface PaymentSession {
   id: string;
   automationId: string;
   payerAddress: string;
-  network: Network;
+  network: "TESTNET" | "PUBLIC";
   assetContract: string;
   treasuryAddress: string;
   amount: string;
@@ -144,10 +94,9 @@ export async function insertAutomation(automation: Automation): Promise<void> {
       encryption_version,policy_input_json,policy_input_xdr_base64,
       delegate_pop_hex,delegate_pop_xdr_base64,strategy_json,schedule_json,
       valid_after_ledger,expires_at_ledger,max_uses,payment_status,payment_amount,
-      payment_asset,payment_network,payment_treasury,payment_quote_expires_at,
-      next_run_at,last_run_at,last_finished_at
+      payment_asset,payment_network,payment_treasury,payment_quote_expires_at
     ) VALUES(
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28
     )`,
     [
       automation.id,
@@ -178,9 +127,6 @@ export async function insertAutomation(automation: Automation): Promise<void> {
       automation.paymentNetwork,
       automation.paymentTreasury,
       automation.paymentQuoteExpiresAt,
-      automation.nextRunAt,
-      automation.lastRunAt,
-      automation.lastFinishedAt,
     ]
   );
 }
@@ -190,65 +136,41 @@ export async function getAutomation(id: string): Promise<Automation | null> {
   return query.rows[0] ? toAutomation(query.rows[0]) : null;
 }
 
+/**
+ * Returns every automation owned by a wallet.
+ *
+ * When network is supplied, results are restricted to that Stellar network.
+ * Results are returned newest first so the client can display the most recent
+ * automations without applying its own ordering.
+ */
 export async function getAutomationsByWallet(
   walletAddress: string,
-  network?: Network
+  network?: "TESTNET" | "PUBLIC"
 ): Promise<Automation[]> {
-  const query = await pool.query(
-    `SELECT * FROM automations
-     WHERE wallet_address=$1
-       AND ($2::text IS NULL OR network=$2)
-     ORDER BY created_at DESC, id DESC`,
-    [walletAddress, network ?? null]
-  );
+  const normalizedWalletAddress = walletAddress.trim();
+
+  if (!normalizedWalletAddress) {
+    throw new Error("walletAddress is required");
+  }
+
+  const query = network
+    ? await pool.query(
+        `SELECT *
+           FROM automations
+          WHERE wallet_address = $1
+            AND network = $2
+          ORDER BY created_at DESC, id DESC`,
+        [normalizedWalletAddress, network]
+      )
+    : await pool.query(
+        `SELECT *
+           FROM automations
+          WHERE wallet_address = $1
+          ORDER BY created_at DESC, id DESC`,
+        [normalizedWalletAddress]
+      );
+
   return query.rows.map(toAutomation);
-}
-
-export async function getAutomationsByWalletPage(input: {
-  walletAddress: string;
-  network?: Network;
-  limit: number;
-  cursor?: AutomationCursor | null;
-}): Promise<AutomationPage> {
-  const queryLimit = input.limit + 1;
-  const cursorCreatedAt = input.cursor?.createdAt ?? null;
-  const cursorId = input.cursor?.id ?? null;
-
-  const query = await pool.query(
-    `SELECT *
-       FROM automations
-      WHERE wallet_address=$1
-        AND ($2::text IS NULL OR network=$2)
-        AND (
-          $3::timestamptz IS NULL
-          OR (created_at, id) < ($3::timestamptz, $4::uuid)
-        )
-      ORDER BY created_at DESC, id DESC
-      LIMIT $5`,
-    [
-      input.walletAddress,
-      input.network ?? null,
-      cursorCreatedAt,
-      cursorId,
-      queryLimit,
-    ]
-  );
-
-  const hasMore = query.rows.length > input.limit;
-  const rows = hasMore ? query.rows.slice(0, input.limit) : query.rows;
-  const items = rows.map(toAutomation);
-  const last = items.at(-1);
-
-  return {
-    items,
-    nextCursor:
-      hasMore && last?.createdAt
-        ? encodeAutomationCursor({
-            createdAt: last.createdAt.toISOString(),
-            id: last.id,
-          })
-        : null,
-  };
 }
 
 export async function createPaymentSession(
@@ -289,7 +211,11 @@ export async function claimPaymentSession(
     );
     if (!query.rows[0]) throw new Error("Payment session not found");
     const session = toPaymentSession(query.rows[0]);
-    if (session.status === "SETTLED" || session.status === "SUBMITTED") {
+    if (session.status === "SETTLED") {
+      await client.query("COMMIT");
+      return session;
+    }
+    if (session.status === "SUBMITTED") {
       await client.query("COMMIT");
       return session;
     }
@@ -351,7 +277,10 @@ export async function finalizePaymentSession(
       await client.query("COMMIT");
       return;
     }
-    if (!["SETTLING", "SUBMITTED"].includes(query.rows[0].status)) {
+    if (
+      query.rows[0].status !== "SETTLING" &&
+      query.rows[0].status !== "SUBMITTED"
+    ) {
       throw new Error(
         `Payment session cannot finalize from ${query.rows[0].status}`
       );
@@ -400,45 +329,10 @@ export async function activateAutomation(
   jobId: string
 ): Promise<void> {
   await pool.query(
-    `UPDATE automations
-        SET status='ACTIVE',onchain_policy_id_hex=$2,
-            session_creation_tx_hash=$3,agenda_job_id=$4,
-            activated_at=COALESCE(activated_at,now()),updated_at=now()
-      WHERE id=$1 AND payment_status='PAID'`,
+    `UPDATE automations SET status='ACTIVE',onchain_policy_id_hex=$2,
+      session_creation_tx_hash=$3,agenda_job_id=$4,activated_at=now(),updated_at=now()
+     WHERE id=$1 AND payment_status='PAID'`,
     [id, policyId, txHash, jobId]
-  );
-}
-
-export async function syncAutomationSchedule(
-  id: string,
-  jobId: string,
-  nextRunAt: Date | null
-): Promise<void> {
-  await pool.query(
-    `UPDATE automations
-        SET agenda_job_id=$2,next_run_at=$3,updated_at=now()
-      WHERE id=$1`,
-    [id, jobId, nextRunAt]
-  );
-}
-
-export async function markAutomationRunStarted(input: {
-  id: string;
-  lastRunAt: Date;
-  nextRunAt: Date | null;
-}): Promise<void> {
-  await pool.query(
-    `UPDATE automations
-        SET last_run_at=$2,next_run_at=$3,last_error=NULL,updated_at=now()
-      WHERE id=$1`,
-    [input.id, input.lastRunAt, input.nextRunAt]
-  );
-}
-
-export async function clearAutomationNextRun(id: string): Promise<void> {
-  await pool.query(
-    `UPDATE automations SET next_run_at=NULL,updated_at=now() WHERE id=$1`,
-    [id]
   );
 }
 
@@ -446,75 +340,42 @@ export async function setStatus(
   id: string,
   status: Automation["status"]
 ): Promise<void> {
-  const clearsNextRun = ["PAUSED", "REVOKED", "EXPIRED", "FAILED"].includes(
-    status
+  const result = await pool.query(
+    `
+      UPDATE automations
+      SET
+        status = $2,
+        updated_at = now(),
+        revoked_at = CASE
+          WHEN $3 THEN COALESCE(revoked_at, now())
+          ELSE revoked_at
+        END
+      WHERE id = $1
+    `,
+    [id, status, status === "REVOKED"]
   );
-  await pool.query(
-    `UPDATE automations
-        SET status=$2,
-            next_run_at=CASE WHEN $3::boolean THEN NULL ELSE next_run_at END,
-            revoked_at=CASE WHEN $2='REVOKED' THEN COALESCE(revoked_at,now()) ELSE revoked_at END,
-            updated_at=now()
-      WHERE id=$1`,
-    [id, status, clearsNextRun]
-  );
-}
 
-export interface RunTiming {
-  lastRunAt: Date;
-  lastFinishedAt: Date;
-  nextRunAt: Date | null;
+  if (result.rowCount !== 1) {
+    throw new Error(`Automation ${id} was not found`);
+  }
 }
 
 export async function runSuccess(
   id: string,
   amount: string,
-  tx: string | null,
-  timing?: RunTiming
+  tx: string | null
 ): Promise<void> {
   await pool.query(
-    `UPDATE automations
-        SET run_count=run_count+1,
-            spent_amount=spent_amount+$2::numeric,
-            last_run_at=COALESCE($3::timestamptz,last_run_at,now()),
-            last_finished_at=COALESCE($4::timestamptz,now()),
-            next_run_at=CASE
-              WHEN max_uses IS NOT NULL AND run_count+1 >= max_uses THEN NULL
-              ELSE $5::timestamptz
-            END,
-            last_error=NULL,
-            updated_at=now()
-      WHERE id=$1`,
-    [
-      id,
-      amount,
-      timing?.lastRunAt ?? null,
-      timing?.lastFinishedAt ?? null,
-      timing?.nextRunAt ?? null,
-    ]
+    `UPDATE automations SET run_count=run_count+1,spent_amount=spent_amount+$2::numeric,
+      last_run_at=now(),last_error=NULL,updated_at=now() WHERE id=$1`,
+    [id, amount]
   );
   void tx;
 }
 
-export async function runFailure(
-  id: string,
-  error: string,
-  timing?: RunTiming
-): Promise<void> {
+export async function runFailure(id: string, error: string): Promise<void> {
   await pool.query(
-    `UPDATE automations
-        SET last_run_at=COALESCE($2::timestamptz,last_run_at,now()),
-            last_finished_at=COALESCE($3::timestamptz,now()),
-            next_run_at=$4::timestamptz,
-            last_error=$5,
-            updated_at=now()
-      WHERE id=$1`,
-    [
-      id,
-      timing?.lastRunAt ?? null,
-      timing?.lastFinishedAt ?? null,
-      timing?.nextRunAt ?? null,
-      error.slice(0, 5001),
-    ]
+    "UPDATE automations SET last_run_at=now(),last_error=$2,updated_at=now() WHERE id=$1",
+    [id, error.slice(0, 5001)]
   );
 }

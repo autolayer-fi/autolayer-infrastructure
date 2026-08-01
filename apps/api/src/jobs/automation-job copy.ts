@@ -5,12 +5,9 @@ import { env } from "../config/env.js";
 import { pool } from "../db/pool.js";
 import { executeAutomation } from "../services/execution.js";
 import {
-  clearAutomationNextRun,
   getAutomation,
-  markAutomationRunStarted,
   runFailure,
   runSuccess,
-  syncAutomationSchedule,
 } from "../services/repository.js";
 import { logger } from "../utils/logger.js";
 import { agenda } from "./agenda.js";
@@ -30,12 +27,6 @@ function toErrorDetails(error: unknown): unknown {
   };
 }
 
-function validDate(value: unknown): Date | null {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(String(value));
-  return Number.isFinite(date.getTime()) ? date : null;
-}
-
 export function defineAutomationJob(): void {
   agenda.define<AutomationJobData>(
     JOB_NAME,
@@ -46,15 +37,12 @@ export function defineAutomationJob(): void {
         throw new Error("Agenda job is missing automationId");
       }
 
-      const scheduledFor = validDate(job.attrs.lastRunAt) ?? new Date();
-      const nextRunAt = validDate(job.attrs.nextRunAt);
-
       logger.info(
         {
           automationId,
           jobId: String(job.attrs._id ?? ""),
-          lastRunAt: scheduledFor,
-          nextRunAt,
+          lastRunAt: job.attrs.lastRunAt,
+          nextRunAt: job.attrs.nextRunAt,
         },
         "Automation job handler started"
       );
@@ -62,19 +50,11 @@ export function defineAutomationJob(): void {
       const automation = await getAutomation(automationId);
 
       if (!automation) {
-        logger.warn(
-          { automationId },
-          "Automation was not found; cancelling orphaned job"
-        );
-        await agenda.cancel({
-          name: JOB_NAME,
-          "data.automationId": automationId,
-        } as never);
+        logger.warn({ automationId }, "Automation was not found; skipping job");
         return;
       }
 
       if (automation.status !== "ACTIVE") {
-        await clearAutomationNextRun(automationId);
         logger.info(
           { automationId, status: automation.status },
           "Automation is not active; skipping job"
@@ -98,13 +78,8 @@ export function defineAutomationJob(): void {
         return;
       }
 
-      await markAutomationRunStarted({
-        id: automationId,
-        lastRunAt: scheduledFor,
-        nextRunAt,
-      });
-
       const runId = randomUUID();
+      const scheduledFor = job.attrs.lastRunAt ?? new Date();
       const idempotencyKey = `${automation.id}:${scheduledFor.toISOString()}`;
 
       const inserted = await pool.query(
@@ -122,17 +97,6 @@ export function defineAutomationJob(): void {
       );
 
       if (!inserted.rowCount) {
-        const finishedAt = new Date();
-        await pool.query(
-          `UPDATE automations
-              SET last_run_at=$2,
-                  last_finished_at=$3,
-                  next_run_at=$4,
-                  updated_at=now()
-            WHERE id=$1`,
-          [automationId, scheduledFor, finishedAt, nextRunAt]
-        );
-
         logger.info(
           { automationId, runId, idempotencyKey },
           "Duplicate automation run skipped"
@@ -152,7 +116,6 @@ export function defineAutomationJob(): void {
 
       try {
         const output = await executeAutomation(automation, runId);
-        const finishedAt = new Date();
 
         await pool.query(
           `UPDATE automation_runs
@@ -160,29 +123,33 @@ export function defineAutomationJob(): void {
              status='SUCCEEDED',
              transaction_hash=$2,
              response_json=$3,
-             completed_at=$4
+             completed_at=now()
            WHERE id=$1`,
           [
             runId,
             output.transactionHash,
             JSON.stringify({
+              executionStatus: output.status,
               ...output.response,
               transactionHashes: output.transactionHashes,
             }),
-            finishedAt,
           ]
         );
 
-        await runSuccess(automation.id, output.amount, output.transactionHash, {
-          lastRunAt: scheduledFor,
-          lastFinishedAt: finishedAt,
-          nextRunAt,
-        });
-
-        const nextRunCount = automation.runCount + 1;
-        if (automation.maxUses !== null && nextRunCount >= automation.maxUses) {
-          await cancelAutomationJob(automationId);
+        if (output.status === "SKIPPED") {
+          logger.info(
+            {
+              automationId,
+              runId,
+              reason: output.response.skipped?.reason,
+              rebalance: output.response.skipped?.rebalance,
+            },
+            "Automation check completed without submitting a transaction"
+          );
+          return;
         }
+
+        await runSuccess(automation.id, output.amount, output.transactionHash);
 
         logger.info(
           {
@@ -191,38 +158,28 @@ export function defineAutomationJob(): void {
             amount: output.amount,
             transactionHash: output.transactionHash,
             transactionHashes: output.transactionHashes,
-            nextRunAt:
-              automation.maxUses !== null && nextRunCount >= automation.maxUses
-                ? null
-                : nextRunAt,
           },
           "Automation run succeeded"
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        const finishedAt = new Date();
 
         await pool.query(
           `UPDATE automation_runs
            SET
              status='FAILED',
              error=$2,
-             completed_at=$3
+             completed_at=now()
            WHERE id=$1`,
-          [runId, message.slice(0, 5000), finishedAt]
+          [runId, message.slice(0, 5000)]
         );
 
-        await runFailure(automation.id, message, {
-          lastRunAt: scheduledFor,
-          lastFinishedAt: finishedAt,
-          nextRunAt,
-        });
+        await runFailure(automation.id, message);
 
         logger.error(
           {
             automationId,
             runId,
-            nextRunAt,
             error: toErrorDetails(error),
           },
           "Automation run failed"
@@ -248,24 +205,39 @@ export async function scheduleAutomation(
   firstRunAt: Date,
   maxUses: number | null
 ): Promise<string> {
-  await agenda.cancel({
+  const cancelled = await agenda.cancel({
     name: JOB_NAME,
-    "data.automationId": automationId,
-  } as never);
+    data: {
+      automationId,
+    },
+  });
+
+  logger.info(
+    {
+      automationId,
+      cancelled,
+    },
+    "Existing jobs for automation cleared"
+  );
 
   if (!(firstRunAt instanceof Date) || !Number.isFinite(firstRunAt.getTime())) {
     throw new Error("firstRunAt must be a valid Date");
   }
 
   const now = Date.now();
+
   const resolvedFirstRunAt =
     firstRunAt.getTime() > now ? firstRunAt : new Date(now + 5_000);
 
-  const job = agenda.create(JOB_NAME, { automationId });
+  const job = agenda.create(JOB_NAME, {
+    automationId,
+  });
 
   job.unique({
     name: JOB_NAME,
-    "data.automationId": automationId,
+    data: {
+      automationId,
+    },
   });
 
   if (maxUses === 1) {
@@ -275,19 +247,17 @@ export async function scheduleAutomation(
       timezone,
       skipImmediate: true,
     });
+
     job.schedule(resolvedFirstRunAt);
   }
 
   await job.save();
 
   const jobId = job.attrs._id;
+
   if (!jobId) {
     throw new Error("Agenda did not return a job ID");
   }
-
-  const nextRunAt = validDate(job.attrs.nextRunAt) ?? resolvedFirstRunAt;
-
-  await syncAutomationSchedule(automationId, String(jobId), nextRunAt);
 
   logger.info(
     {
@@ -298,7 +268,7 @@ export async function scheduleAutomation(
       timezone,
       maxUses,
       firstRunAt: resolvedFirstRunAt,
-      nextRunAt,
+      nextRunAt: job.attrs.nextRunAt,
     },
     "Automation scheduled"
   );
@@ -309,69 +279,16 @@ export async function scheduleAutomation(
 export async function cancelAutomationJob(automationId: string): Promise<void> {
   const cancelled = await agenda.cancel({
     name: JOB_NAME,
-    "data.automationId": automationId,
-  } as never);
-
-  await clearAutomationNextRun(automationId);
-
-  logger.info({ automationId, cancelled }, "Automation job cancelled");
-}
-
-/**
- * One-time startup reconciliation for deployments that already had Agenda jobs
- * before next_run_at was persisted in PostgreSQL.
- *
- * Read routes never call Agenda. This function only inspects ACTIVE and PAUSED
- * records at worker startup, as requested.
- */
-export async function reconcileAutomationSchedules(): Promise<void> {
-  const result = await pool.query<{
-    id: string;
-    status: "ACTIVE" | "PAUSED";
-  }>(
-    `SELECT id,status
-       FROM automations
-      WHERE status IN ('ACTIVE','PAUSED')`
-  );
-
-  if (result.rows.length === 0) return;
-
-  const ids = result.rows.map((row) => row.id);
-  const jobs = await agenda.jobs({
-    name: JOB_NAME,
-    "data.automationId": { $in: ids },
-  } as never);
-
-  const jobsByAutomationId = new Map(
-    jobs.map((job) => [String(job.attrs.data?.automationId ?? ""), job])
-  );
-
-  await Promise.all(
-    result.rows.map(async (row) => {
-      if (row.status === "PAUSED") {
-        await clearAutomationNextRun(row.id);
-        return;
-      }
-
-      const job = jobsByAutomationId.get(row.id);
-      const jobId = job?.attrs._id ? String(job.attrs._id) : null;
-      const nextRunAt = validDate(job?.attrs.nextRunAt);
-
-      if (!jobId || !nextRunAt) {
-        await clearAutomationNextRun(row.id);
-        logger.warn(
-          { automationId: row.id },
-          "Active automation has no schedulable Agenda job during reconciliation"
-        );
-        return;
-      }
-
-      await syncAutomationSchedule(row.id, jobId, nextRunAt);
-    })
-  );
+    data: {
+      automationId,
+    },
+  });
 
   logger.info(
-    { checked: result.rows.length },
-    "Automation schedule reconciliation completed"
+    {
+      automationId,
+      cancelled,
+    },
+    "Automation job cancelled"
   );
 }

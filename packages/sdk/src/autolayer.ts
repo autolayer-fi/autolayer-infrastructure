@@ -1,4 +1,8 @@
-import { AutoLayerClient, type AutoLayerConfiguration } from "./client.js";
+import {
+  AutoLayerClient,
+  type AutoLayerConfiguration,
+  type FetchAllAutomationsOptions,
+} from "./client.js";
 
 import type {
   ActivateAutomationInput,
@@ -22,6 +26,17 @@ export const AutoLayer = {
 
   get(ref: AutomationRef) {
     return client.get(ref);
+  },
+
+  /**
+   * Fetches every automation tied to a wallet directly from AutoLayer.
+   *
+   * The returned records include AutoLayer's current lifecycle state,
+   * scheduled-run limits, completed run count, remaining runs, payment state,
+   * spend amount, expiry information, pause state, and cancellation state.
+   */
+  fetchAll(walletAddress: string, options?: FetchAllAutomationsOptions) {
+    return client.fetchAll(walletAddress, options);
   },
 
   pay(ref: AutomationRef, options?: RequestPaymentOptions) {
@@ -50,6 +65,17 @@ export const AutoLayer = {
 
   resume(ref: AutomationRef) {
     return client.resume(ref);
+  },
+
+  /**
+   * Permanently stops AutoLayer from scheduling or executing the automation.
+   *
+   * This is distinct from pause because a cancelled automation cannot be
+   * resumed. Revoke the wallet session on-chain separately when immediate
+   * delegated-key invalidation is also required.
+   */
+  cancel(ref: AutomationRef) {
+    return client.cancel(ref);
   },
 
   revoke(ref: AutomationRef) {

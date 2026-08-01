@@ -35,8 +35,10 @@ export interface RebalanceStrategy {
   protocol: ProtocolConfig;
   allowedAssets: string[];
   targetWeightsBps: number[];
-  rebalanceThresholdBps?: number;
-  slippageBps?: number;
+  /** Absolute portfolio-weight deviation that triggers a trade. 500 = 5 percentage points. */
+  rebalanceThresholdBps: number;
+  /** Maximum accepted price impact / quote slippage. 100 = 1%. */
+  slippageBps: number;
   maxTradeAmount: string;
   maxTotalAmount: string;
   spendRecipients: string[];
@@ -131,6 +133,7 @@ export interface ProposalResponse {
 export interface PaymentPrepareInput {
   payerAddress: string;
 }
+
 export interface PaymentPrepareResponse {
   paymentSessionId: string;
   automationId: string;
@@ -143,10 +146,12 @@ export interface PaymentPrepareResponse {
   signatureExpirationLedger: number;
   requirements: X402PaymentRequirements;
 }
+
 export interface PaymentSettleInput {
   paymentSessionId: string;
   signedAuthEntriesXdr: string[];
 }
+
 export interface PaymentSettlementResponse {
   automationId: string;
   paymentStatus: "PAID";
@@ -160,11 +165,13 @@ export interface PaymentResponse {
   payer?: string | null;
   paymentResponse?: unknown;
 }
+
 export interface ActivateAutomationInput {
   policyIdHex: string;
   transactionHash: string;
   firstRunAt: string;
 }
+
 export interface ActivationResponse {
   automationId: string;
   status: "ACTIVE";
@@ -173,23 +180,11 @@ export interface ActivationResponse {
   paymentResponse?: unknown;
 }
 
-export type PublicAutomationState =
-  | "PROPOSED"
-  | "PAYMENT_REQUIRED"
-  | "READY_TO_ACTIVATE"
-  | "ACTIVE"
-  | "PAUSED"
-  | "COMPLETED"
-  | "CANCELLED"
-  | "FAILED"
-  | "EXPIRED";
-
 export interface AutomationResponse {
   id: string;
   network: Network;
   type: StrategyType;
   status: AutomationStatus;
-  state: PublicAutomationState;
   walletAddress: string;
   policyIdHex: string | null;
   expectedPolicyIdHex: string;
@@ -203,28 +198,9 @@ export interface AutomationResponse {
     network: string;
     payTo: string;
     transactionHash: string | null;
-    payer?: string | null;
   };
   runCount: number;
   spentAmount: string;
-  agendaJobId: string | null;
-  nextRunAt: string | null;
-  lastRunAt: string | null;
-  lastFinishedAt: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-  activatedAt: string | null;
-  revokedAt: string | null;
-  lastError: string | null;
-}
-
-export interface AutomationPageResponse {
-  walletAddress: string;
-  network: Network | null;
-  count: number;
-  limit: number;
-  nextCursor: string | null;
-  automations: AutomationResponse[];
 }
 
 export interface LifecycleResponse {
@@ -235,6 +211,7 @@ export interface LifecycleResponse {
 }
 
 export type AutomationRef = string | { automationId: string; network: Network };
+
 export type PaymentHandler = (
   requirements: X402PaymentRequirements,
   context: {
@@ -243,10 +220,12 @@ export type PaymentHandler = (
     operation: "pay" | "activate";
   }
 ) => Promise<string> | string;
+
 export interface RequestPaymentOptions {
   paymentSignature?: string;
   paymentHandler?: PaymentHandler;
 }
+
 export interface EncryptedValue {
   ciphertext: string;
   iv: string;
@@ -280,17 +259,9 @@ export interface Automation {
   paymentStatus: PaymentStatus;
   paymentAmount: string;
   paymentAsset: string;
-  paymentNetwork: Network;
+  paymentNetwork: "TESTNET" | "PUBLIC";
   paymentTreasury: string;
   paymentQuoteExpiresAt: Date;
   paymentTxHash: string | null;
   paymentPayer: string | null;
-  nextRunAt: Date | null;
-  lastRunAt: Date | null;
-  lastFinishedAt: Date | null;
-  createdAt: Date | null;
-  updatedAt: Date | null;
-  activatedAt: Date | null;
-  revokedAt: Date | null;
-  lastError: string | null;
 }

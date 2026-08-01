@@ -22,9 +22,8 @@ import { activateSchema, proposalSchema } from "./schemas.js";
 
 import {
   activateAutomation,
-  decodeAutomationCursor,
   getAutomation,
-  getAutomationsByWalletPage,
+  getAutomationsByWallet,
   insertAutomation,
   setStatus,
 } from "../services/repository.js";
@@ -409,14 +408,6 @@ function publicAutomation(automation: Automation) {
     },
     runCount: automation.runCount,
     spentAmount: automation.spentAmount,
-    nextRunAt: automation.nextRunAt?.toISOString() ?? null,
-    lastRunAt: automation.lastRunAt?.toISOString() ?? null,
-    lastFinishedAt: automation.lastFinishedAt?.toISOString() ?? null,
-    createdAt: automation.createdAt?.toISOString() ?? null,
-    updatedAt: automation.updatedAt?.toISOString() ?? null,
-    activatedAt: automation.activatedAt?.toISOString() ?? null,
-    revokedAt: automation.revokedAt?.toISOString() ?? null,
-    lastError: automation.lastError,
   };
 }
 
@@ -568,22 +559,6 @@ routes.post("/v1/automations/proposals", async (request, response, next) => {
       paymentTxHash: null,
 
       paymentPayer: null,
-
-      nextRunAt: null,
-
-      lastRunAt: null,
-
-      lastFinishedAt: null,
-
-      createdAt: null,
-
-      updatedAt: null,
-
-      activatedAt: null,
-
-      revokedAt: null,
-
-      lastError: null,
     };
 
     await insertAutomation(automation);
@@ -884,44 +859,17 @@ routes.get("/v1/automations", async (request, response, next) => {
       });
     }
 
-    const parsedLimit = Number(request.query.limit ?? 25);
-    const limit = Number.isFinite(parsedLimit)
-      ? Math.min(Math.max(Math.trunc(parsedLimit), 1), 100)
-      : 25;
-
-    const cursorValue = String(request.query.cursor ?? "").trim();
-    let cursor = null;
-
-    if (cursorValue) {
-      try {
-        cursor = decodeAutomationCursor(cursorValue);
-      } catch (error) {
-        return response.status(400).json({
-          error:
-            error instanceof Error
-              ? error.message
-              : "Invalid pagination cursor",
-        });
-      }
-    }
-
-    const page = await getAutomationsByWalletPage({
+    const automations = await getAutomationsByWallet(
       walletAddress,
-      network: networkValue
-        ? (networkValue as "PUBLIC" | "TESTNET")
-        : undefined,
-      limit,
-      cursor,
-    });
+      networkValue ? (networkValue as "PUBLIC" | "TESTNET") : undefined
+    );
 
-    const items = page.items.map(publicAutomation);
+    const items = automations.map(publicAutomation);
 
     return response.json({
       walletAddress,
       network: networkValue || null,
       count: items.length,
-      limit,
-      nextCursor: page.nextCursor,
       automations: items,
     });
   } catch (error) {
