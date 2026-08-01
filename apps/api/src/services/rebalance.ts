@@ -82,13 +82,18 @@ function assertRebalanceStrategy(
   if (new Set(strategy.allowedAssets).size !== strategy.allowedAssets.length) {
     throw new Error("Rebalancing assets must be unique");
   }
-  if (strategy.targetWeightsBps.reduce((sum, item) => sum + item, 0) !== 10_000) {
+  if (
+    strategy.targetWeightsBps.reduce((sum, item) => sum + item, 0) !== 10_000
+  ) {
     throw new Error("Rebalancing target weights must total 10000 bps");
   }
+  const threshold = strategy.rebalanceThresholdBps;
+
   if (
-    !Number.isInteger(strategy.rebalanceThresholdBps) ||
-    strategy.rebalanceThresholdBps <= 0 ||
-    strategy.rebalanceThresholdBps > 5_000
+    threshold === undefined ||
+    !Number.isInteger(threshold) ||
+    threshold <= 0 ||
+    threshold > 5_000
   ) {
     throw new Error("rebalanceThresholdBps must be between 1 and 5000");
   }
@@ -203,11 +208,23 @@ export async function buildAquariusRebalancePlan(input: {
     )
   );
 
+  const thresholdBps = strategy.rebalanceThresholdBps;
+
+  if (
+    thresholdBps === undefined ||
+    !Number.isInteger(thresholdBps) ||
+    thresholdBps <= 0 ||
+    thresholdBps > 5_000
+  ) {
+    throw new Error("rebalanceThresholdBps must be between 1 and 5000");
+  }
+
   const totalValue = values.reduce((sum, value) => sum + value, 0n);
+
   const baseAnalysis: RebalanceAnalysis = {
     valuationAsset: getUsdcContract(input.automation.network),
     totalValueInUsdc: totalValue.toString(),
-    thresholdBps: strategy.rebalanceThresholdBps,
+    thresholdBps,
     positions: [],
   };
 
@@ -259,12 +276,12 @@ export async function buildAquariusRebalancePlan(input: {
   }
 
   if (
-    overweight.deviationBps < strategy.rebalanceThresholdBps ||
-    Math.abs(underweight.deviationBps) < strategy.rebalanceThresholdBps
+    overweight.deviationBps < thresholdBps ||
+    Math.abs(underweight.deviationBps) < thresholdBps
   ) {
     return {
       status: "SKIPPED",
-      reason: `Portfolio is within the ${strategy.rebalanceThresholdBps} bps rebalance threshold`,
+      reason: `Portfolio is within the ${thresholdBps} bps rebalance threshold`,
       analysis,
     };
   }
@@ -301,12 +318,23 @@ export async function buildAquariusRebalancePlan(input: {
     };
   }
 
+  const slippageBps = strategy.slippageBps;
+
+  if (
+    slippageBps === undefined ||
+    !Number.isInteger(slippageBps) ||
+    slippageBps < 0 ||
+    slippageBps > 5_000
+  ) {
+    throw new Error("slippageBps must be between 0 and 5000");
+  }
+
   const quote = await getAquariusStrictSendQuote({
     network: input.automation.network,
     tokenInContract: overweight.asset,
     tokenOutContract: underweight.asset,
     inputAmount: inputAmount.toString(),
-    slippageBps: strategy.slippageBps,
+    slippageBps,
     maxDepth: input.maxDepth,
   });
 

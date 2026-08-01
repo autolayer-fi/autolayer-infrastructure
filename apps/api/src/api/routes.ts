@@ -905,11 +905,14 @@ routes.get("/v1/automations", async (request, response, next) => {
       }
     }
 
+    const network =
+      networkValue === "PUBLIC" || networkValue === "TESTNET"
+        ? networkValue
+        : undefined;
+
     const page = await getAutomationsByWalletPage({
       walletAddress,
-      network: networkValue
-        ? (networkValue as "PUBLIC" | "TESTNET")
-        : undefined,
+      ...(network !== undefined ? { network } : {}),
       limit,
       cursor,
     });
