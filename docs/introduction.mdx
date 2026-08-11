@@ -1,0 +1,38 @@
+---
+title: "AutoLayer"
+description: "Execution, payment, discovery, and automation infrastructure for Stellar applications and agents."
+---
+
+AutoLayer gives applications and autonomous software a high-level interface for economic actions on Stellar. It combines transaction execution, Soroban invocation, scheduled automation, x402 exact payments, sponsored fees, service discovery, and agent-readable financial skills.
+
+<CardGroup cols={2}>
+  <Card title="Build an automation" icon="clock" href="/products/runtime">Schedule policy-bound Stellar work.</Card>
+  <Card title="Accept x402" icon="coins" href="/products/facilitator">Protect a resource with machine-native payment.</Card>
+  <Card title="Publish a service" icon="magnifying-glass" href="/products/bazaar">Make HTTP and MCP resources discoverable.</Card>
+  <Card title="Wrap an API" icon="route" href="/products/xwrapper">Understand the xWrapper gateway and its implementation status.</Card>
+</CardGroup>
+
+<Note>
+AutoLayer is an independent product. It has no architectural or product dependency on another agent platform.
+</Note>
+
+## Product surfaces
+
+| Surface | Local URL | Purpose |
+| --- | --- | --- |
+| Public site | `http://localhost:5173` | Product information and developer entry point |
+| Playground | `http://localhost:5173/playground` | Safe exploration and explicit previews |
+| Console | `http://localhost:5173/console` | Wallet, automation, transaction, facilitator, Bazaar, and Skills UI |
+| API | `http://localhost:5001` | Runtime, x402, discovery, skills, and MCP service |
+| Documentation | `https://docs.autolayer.fi` | Mintlify developer and operator guides |
+
+AutoLayer uses CAIP-2 identifiers at the protocol boundary: `stellar:testnet` and `stellar:pubnet`. Console automation inputs use `TESTNET` and `PUBLIC` internally and convert at integration boundaries.
+
+## Choose a path
+
+<CardGroup cols={2}>
+  <Card title="Application developer" icon="code" href="/sdk/typescript">Use the typed SDK and wallet authorization flow.</Card>
+  <Card title="Contract developer" icon="cube" href="/products/runtime">Expose safe, schedulable Soroban functions.</Card>
+  <Card title="API seller" icon="route" href="/products/xwrapper">Publish a paid, discoverable HTTPS endpoint.</Card>
+  <Card title="Infrastructure operator" icon="server" href="/operations/deployment">Deploy signers, workers, PostgreSQL, and monitoring.</Card>
+</CardGroup>

@@ -20,6 +20,8 @@ const schema = z.object({
 		.max(1000)
 		.default(120),
 	STELLAR_RPC_KEY: z.string(),
+	STELLAR_MAINNET_RPC_URL: z.string().url().default("https://mainnet.sorobanrpc.com"),
+	X402_MAX_TRANSACTION_FEE_STROOPS: z.coerce.number().int().positive().default(50000),
 	AUTOMATION_PAYMASTER_SECRET: z.string().min(56),
 	PAYMENT_RELAYER_SECRET: z.string().min(56),
 	TREASURY_G_ACCOUNT: z.string().regex(/^G[A-Z2-7]{55}$/),
@@ -42,11 +44,16 @@ const schema = z.object({
 	AGENDA_MAX_CONCURRENCY: z.coerce.number().int().positive().default(10),
 	JOB_LOCK_LIFETIME_MS: z.coerce.number().int().positive().default(120000),
 	HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+	XWRAPPER_API_KEYS: z.string().default("dev-autolayer-change-me"),
+	XWRAPPER_MAX_REDIRECTS: z.coerce.number().int().min(0).max(5).default(0),
 });
 
 const parsed = schema.safeParse(process.env);
 if (!parsed.success)
 	throw new Error(`Invalid environment: ${parsed.error.message}`);
+if (parsed.data.NODE_ENV === "production" && parsed.data.XWRAPPER_API_KEYS === "dev-autolayer-change-me") {
+	throw new Error("XWRAPPER_API_KEYS must be replaced in production");
+}
 
 const masterKey = Buffer.from(parsed.data.KEY_ENCRYPTION_MASTER_KEY, "base64");
 if (masterKey.length !== 32) {

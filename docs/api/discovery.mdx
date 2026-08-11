@@ -1,0 +1,30 @@
+---
+title: "Discovery API"
+description: "Browse and search the Stellar Bazaar with interoperable filters and pagination."
+---
+
+## Browse resources
+
+`GET /discovery/resources`
+
+| Query | Meaning |
+| --- | --- |
+| `type` | `http` or `mcp` |
+| `payTo` | Exact settlement recipient |
+| `scheme` | Payment scheme, currently `exact` |
+| `network` | `stellar:testnet` or `stellar:pubnet` |
+| `extensions` | Required extension key |
+| `limit` | Page size, capped server-side |
+| `offset` | Non-negative catalog offset |
+
+The response contains `x402Version`, `items`, and `{ limit, offset, total }` pagination.
+
+## Natural-language search
+
+`GET /discovery/search?query=weather+price&network=stellar:testnet&limit=10`
+
+Search requires `query`, accepts the same resource filters, and uses an opaque `cursor`. The response includes ranked `resources`, a next cursor, and `partialResults`. Treat cursors as opaque and do not construct them in clients.
+
+## Resource representation
+
+Listings include the resource URL, type, optional MCP tool name, human-readable service metadata, accepted x402 requirements and discovery extension data. Consumers should preserve CAIP-2 network identifiers and base-unit payment amounts without normalization that changes precision.

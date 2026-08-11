@@ -1,0 +1,25 @@
+---
+title: "Gateway API"
+description: "Manage xWrapper deployments, encrypted vault secrets, and analytics."
+---
+
+Management routes accept a wallet session, personal API key, or administrative operator key.
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/v1/wrappers` | List wrappers owned by the authenticated user |
+| `GET` | `/v1/wrappers/slug?name=` | Return an available normalized endpoint slug |
+| `POST` | `/v1/wrappers` | Create a disabled or enabled wrapper |
+| `PATCH` | `/v1/wrappers/:id` | Update mutable configuration |
+| `POST` | `/v1/wrappers/:id/enable` | Publish the gateway and Bazaar record |
+| `POST` | `/v1/wrappers/:id/disable` | Stop traffic and remove discovery listing |
+| `DELETE` | `/v1/wrappers/:id` | Delete an owned wrapper |
+| `GET` | `/v1/wrappers/:id/analytics` | Aggregate requests, latency, bytes, and payments |
+| `GET` | `/v1/vault/secrets` | List secret metadata only |
+| `POST` | `/v1/vault/secrets` | Encrypt and store a new scoped credential |
+
+Public traffic uses `ANY /gateway/:slug/*`. The buyer receives canonical `PAYMENT-REQUIRED` terms, retries with `PAYMENT-SIGNATURE`, and receives `PAYMENT-RESPONSE` after settlement.
+
+Slugs are generated from names and checked against PostgreSQL. A collision receives a short suffix; the backend repeats uniqueness checking transactionally and remains authoritative over UI availability hints.
+
+<Note>Vault plaintext is never returned after creation and is injected only into the configured upstream request after successful payment settlement.</Note>

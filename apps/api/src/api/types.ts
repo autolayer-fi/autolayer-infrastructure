@@ -1,14 +1,9 @@
 export type Network = "TESTNET" | "PUBLIC";
 export type AutomationEnvironment = "DEVELOPMENT" | "PRODUCTION";
-export type StrategyType = "DCA" | "REBALANCE" | "DISBURSEMENT";
+export type StrategyType =
+  "CONTRACT_CALL" | "DCA" | "REBALANCE" | "DISBURSEMENT";
 export type AutomationStatus =
-  | "PROPOSED"
-  | "PAID"
-  | "ACTIVE"
-  | "PAUSED"
-  | "REVOKED"
-  | "EXPIRED"
-  | "FAILED";
+  "PROPOSED" | "PAID" | "ACTIVE" | "PAUSED" | "REVOKED" | "EXPIRED" | "FAILED";
 export type PaymentStatus = "REQUIRED" | "VERIFYING" | "PAID" | "FAILED";
 
 export type Schedule =
@@ -53,10 +48,20 @@ export interface DisbursementStrategy {
   repeat: boolean;
 }
 
+export type ContractArgument =
+  | { type: "address"; value: string }
+  | { type: "i128" | "u128"; value: string }
+  | { type: "string" | "symbol"; value: string }
+  | { type: "bool"; value: boolean };
+
+export interface ContractCallStrategy {
+  contractId: string;
+  functionName: string;
+  args: ContractArgument[];
+}
+
 export type StrategyConfig =
-  | DcaStrategy
-  | RebalanceStrategy
-  | DisbursementStrategy;
+  ContractCallStrategy | DcaStrategy | RebalanceStrategy | DisbursementStrategy;
 
 interface ProposalBase {
   walletAddress: string;
@@ -68,6 +73,7 @@ interface ProposalBase {
 }
 
 export type ProposeAutomationInput =
+  | (ProposalBase & { type: "CONTRACT_CALL"; strategy: ContractCallStrategy })
   | (ProposalBase & { type: "DCA"; strategy: DcaStrategy })
   | (ProposalBase & { type: "REBALANCE"; strategy: RebalanceStrategy })
   | (ProposalBase & { type: "DISBURSEMENT"; strategy: DisbursementStrategy });
@@ -241,7 +247,7 @@ export type PaymentHandler = (
     automationId: string;
     network: Network;
     operation: "pay" | "activate";
-  }
+  },
 ) => Promise<string> | string;
 export interface RequestPaymentOptions {
   paymentSignature?: string;

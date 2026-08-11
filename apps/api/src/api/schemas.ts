@@ -116,6 +116,23 @@ const disbursementRecipient = z.object({
   amount: uintString,
 });
 
+const contractArgument = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("address"), value: stellarAddress }),
+  z.object({
+    type: z.enum(["i128", "u128"]),
+    value: z.string().regex(/^\d+$/),
+  }),
+  z.object({ type: z.literal("string"), value: z.string().max(4096) }),
+  z.object({ type: z.literal("symbol"), value: z.string().min(1).max(32) }),
+  z.object({ type: z.literal("bool"), value: z.boolean() }),
+]);
+
+const contractCall = z.object({
+  contractId: contractAddress,
+  functionName: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,31}$/),
+  args: z.array(contractArgument).max(32),
+});
+
 const disbursement = z
   .object({
     asset: contractAddress,
@@ -138,6 +155,7 @@ const disbursement = z
 
 export const proposalSchema = z
   .discriminatedUnion("type", [
+    common.extend({ type: z.literal("CONTRACT_CALL"), strategy: contractCall }),
     common.extend({ type: z.literal("DCA"), strategy: dca }),
     common.extend({ type: z.literal("REBALANCE"), strategy: rebalance }),
     common.extend({ type: z.literal("DISBURSEMENT"), strategy: disbursement }),

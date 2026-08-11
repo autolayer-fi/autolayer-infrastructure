@@ -1,0 +1,49 @@
+---
+title: "Self-hosting"
+description: "Run AutoLayer with your own PostgreSQL, RPC providers, domains, and signing identities."
+---
+
+AutoLayer is Apache-2.0 licensed and can be operated as a private control plane or public hosted provider.
+
+## Local baseline
+
+```bash
+git clone <your-fork>
+cd autolayer-core
+pnpm install
+cp apps/api/.env.example apps/api/.env
+docker compose up -d postgres
+pnpm migrate
+pnpm build
+pnpm start
+```
+
+Run `pnpm setup:dev` instead of manually creating `.env` only for mock-mode local development.
+
+## Required infrastructure
+
+- PostgreSQL with durable storage, backups and appropriate connection limits.
+- Reliable Soroban RPC access for every enabled network.
+- Separate funded automation-paymaster and payment-relayer G-accounts.
+- A 32-byte encryption master key with stable versioning.
+- TLS termination and a public `PUBLIC_BASE_URL` for gateway endpoints.
+- A static host for `apps/web/dist` and a host for the Mintlify docs.
+
+## Domain layout
+
+The recommended public topology is:
+
+- `autolayer.fi`: public website and playground.
+- `console.autolayer.fi`: authenticated console.
+- `core.autolayer.fi`: API, facilitator, discovery, MCP and gateway.
+- `docs.autolayer.fi`: Mintlify documentation.
+
+Fork operators may use any domains, but `VITE_API_URL`, `VITE_CONSOLE_URL`, CORS origins and `PUBLIC_BASE_URL` must agree.
+
+## Hosted-provider controls
+
+Add ingress authentication/rate limiting to facilitator endpoints, WAF request limits, signer balance automation, per-network circuit breakers, database retention jobs, audit-log export, abuse response and published service limits. Keep user personal keys separate from operator keys.
+
+## Upgrades
+
+Read migrations before rollout, back up PostgreSQL, run migrations once, then deploy compatible API/worker versions. Follow upstream `@x402/*` releases and discovery specification changes with wire-level regression tests rather than relying only on type checks.

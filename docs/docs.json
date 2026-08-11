@@ -1,0 +1,40 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "AutoLayer",
+  "description": "Execution, payment, discovery, and automation infrastructure for Stellar",
+  "colors": { "primary": "#34D399", "light": "#6EE7B7", "dark": "#10B981" },
+  "favicon": "/images/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          { "group": "Start", "pages": ["introduction", "quickstart", "sdk/typescript"] },
+          { "group": "Build", "pages": ["products/runtime", "products/facilitator", "products/bazaar", "products/xwrapper", "products/skills"] },
+          { "group": "Architecture", "pages": ["architecture/production-architecture", "architecture/security"] },
+          { "group": "Operate", "pages": ["operations/configuration", "operations/deployment", "operations/monitoring", "operations/self-hosting"] }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "groups": [
+          { "group": "Identity", "pages": ["api/authentication"] },
+          { "group": "Automation", "pages": ["api/automation"] },
+          { "group": "x402", "pages": ["api/facilitator"] },
+          { "group": "Discovery", "pages": ["api/discovery"] },
+          { "group": "Gateway", "pages": ["api/gateway"] },
+          { "group": "Agents", "pages": ["api/mcp-skills"] }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      { "label": "GitHub", "href": "https://github.com/autolayer" },
+      { "label": "Console", "href": "https://console.autolayer.fi" }
+    ],
+    "primary": { "type": "button", "label": "Open Playground", "href": "https://autolayer.fi/playground" }
+  },
+  "footer": { "socials": { "github": "https://github.com/autolayer" } }
+}

@@ -1,0 +1,34 @@
+---
+title: "MCP and Skills APIs"
+description: "Agent-facing service discovery, paid calls, and versioned financial action schemas."
+---
+
+## MCP endpoint
+
+`POST /mcp` implements JSON-RPC initialization, `tools/list`, and `tools/call` for protocol version `2025-06-18`.
+
+### `search_services`
+
+Inputs are natural-language `query`, optional CAIP-2 `network`, and `limit` from 1–50. Output is provided as text content and `structuredContent` so agents do not need to parse prose.
+
+### `paid_call`
+
+Inputs are cataloged HTTPS `url`, wallet-created `paymentSignature`, optional `GET`/`POST` method and optional JSON body. The proxy requires an exact Bazaar match, uses a bounded timeout, and returns upstream status, body and `PAYMENT-RESPONSE` receipt.
+
+Every failure contains a JSON-RPC error with non-null `data.reason`, including `QUERY_REQUIRED`, `RESOURCE_NOT_CATALOGED`, `HTTPS_REQUIRED`, and `PAID_CALL_FAILED`.
+
+## Skills catalog
+
+`GET /v1/skills` accepts:
+
+- `query`: free-text match across metadata and actions.
+- `protocol`: exact protocol name.
+- `network`: `stellar:testnet` or `stellar:pubnet`.
+- `action`: exact supported action.
+
+`GET /v1/skills/:slug/spec` returns `schemaVersion`, semantic skill version, category, authentication mode, networks, safety flags, per-action JSON input/output schemas, deterministic errors with retryability, and relevant endpoints.
+
+```bash
+curl 'http://localhost:5001/v1/skills?protocol=Soroban&action=invoke'
+curl http://localhost:5001/v1/skills/soroban-invoke/spec
+```

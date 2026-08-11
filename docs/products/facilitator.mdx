@@ -1,0 +1,27 @@
+---
+title: "x402 Facilitator"
+description: "Verify and settle exact SEP-41 payments on Stellar testnet and mainnet."
+---
+
+AutoLayer composes the upstream Apache-2.0 `@x402/stellar` exact facilitator for `stellar:testnet` and `stellar:pubnet`. The buyer signs a Soroban authorization entry permitting a specific token transfer. The facilitator builds, simulates, submits, fee-sponsors, and confirms the invocation without taking custody of buyer funds.
+
+## Wire flow
+
+1. A protected server returns HTTP `402` and a `PAYMENT-REQUIRED` header.
+2. The buyer validates network, asset, amount, recipient and expiry.
+3. A SEP-43-capable wallet signs the Soroban authorization entry.
+4. The buyer retries with `PAYMENT-SIGNATURE`.
+5. The resource server or gateway calls `/verify`, then `/settle`.
+6. Successful delivery includes `PAYMENT-RESPONSE` with the settlement receipt.
+
+`GET /supported` advertises x402 v2 exact support, CAIP-2 identifiers, facilitator signers, discovery extensions, and `extra.areFeesSponsored: true`.
+
+## Assets and precision
+
+Settlement accepts SEP-41 token contracts. USDC is the default configured asset, but the verifier uses the payment requirement’s explicit contract. Amounts are integer base units; Stellar assets commonly use seven decimal places. Recipients of issued Classic assets need the appropriate trustline, while contract recipients follow the token contract’s rules.
+
+## Failure rules
+
+Every rejection contains a non-null reason. Modified asset, amount, payee, invocation, expiration or signature must fail. Verification never transfers funds. Failed verification or settlement never falls through to protected resource delivery.
+
+<Warning>`exact` is advertised. `upto` remains unadvertised until the Stellar scheme document, recipient-bound settlement implementation, upstream contribution, conformance fixtures and security review are complete.</Warning>

@@ -1,0 +1,46 @@
+---
+title: "Facilitator API"
+description: "Canonical supported, verify, and settle wire contracts."
+---
+
+## `GET /supported`
+
+Returns x402 v2 exact kinds for `stellar:testnet` and `stellar:pubnet`, supported extensions, public signer identities and `extra.areFeesSponsored: true`.
+
+## Canonical request body
+
+Both mutation endpoints accept the same wrapper without field renaming:
+
+```json
+{
+  "paymentPayload": {
+    "x402Version": 2,
+    "scheme": "exact",
+    "network": "stellar:testnet",
+    "payload": { "transaction": "AAAA..." }
+  },
+  "paymentRequirements": {
+    "scheme": "exact",
+    "network": "stellar:testnet",
+    "asset": "C...",
+    "amount": "100000",
+    "payTo": "G...",
+    "maxTimeoutSeconds": 60,
+    "extra": { "areFeesSponsored": true }
+  }
+}
+```
+
+## `POST /verify`
+
+Validates without settlement. An invalid response always contains `isValid: false` and a non-null `invalidReason`. The endpoint does not catalog discovery metadata because no payment has settled.
+
+## `POST /settle`
+
+Re-verifies, simulates, submits, confirms, and returns the Stellar transaction hash and CAIP-2 network. Failure always includes `success: false` and non-null `errorReason`.
+
+After success, valid Bazaar data is cataloged. The base64-encoded `EXTENSION-RESPONSES` header reports `{ "bazaar": { "success": true|false, "reason"?: "..." } }`.
+
+## Operational semantics
+
+Settlement confirmation timeout is indeterminate. Do not blindly resubmit; reconcile by transaction hash/payload identity. Apply caller authentication and rate limits at the ingress for hosted production service.

@@ -2,21 +2,25 @@
   "name": "@autolayer/monorepo",
   "version": "1.0.0",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@10.34.5",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm build:packages && pnpm --filter @autolayer/api dev",
+    "dev": "pnpm build:packages && pnpm --parallel --filter @autolayer/api --filter @autolayer/web dev",
+    "dev:web": "pnpm --filter @autolayer/web dev",
+    "setup:dev": "pnpm --filter @autolayer/api exec tsx scripts/setup-dev.ts",
     "build": "pnpm -r run build",
     "build:api": "pnpm --filter @autolayer/api build",
+    "build:web": "pnpm --filter @autolayer/web build",
     "build:sdk": "pnpm --filter @autolayer/sdk build",
     "test": "pnpm -r --if-present run test",
     "lint": "pnpm -r --if-present run lint",
     "migrate": "pnpm --filter @autolayer/api migrate",
     "start": "pnpm --filter @autolayer/api start",
     "pack:sdk": "pnpm --filter @autolayer/sdk pack",
-    "build:packages": "pnpm --filter @autolayer/shared build && pnpm --filter @autolayer/crypto build && pnpm --filter @autolayer/sdk build"
+    "build:packages": "pnpm --filter @autolayer/sdk build"
   }
 }

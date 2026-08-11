@@ -1,0 +1,45 @@
+---
+title: "xWrapper Gateway"
+description: "Convert an existing HTTPS API into an x402-payable resource."
+---
+
+xWrapper is the AutoLayer Gateway feature. A seller supplies an HTTPS upstream, accepted Stellar network and asset, per-call price, public discovery metadata, and optionally a reference to a scoped upstream credential. Buyers see x402, while the upstream continues to use its original authentication model.
+
+The Console deploys persistent wrappers through a wallet-authenticated user session. Each enabled wrapper receives a public `/gateway/:slug` endpoint and is indexed in the Stellar Bazaar. Users can create personal API keys for SDK, agent, and CI access; those credentials are displayed once and stored only as hashes.
+
+<Warning>
+  Use `XWRAPPER_API_KEYS` only for administrative or self-hosted operator
+  access. It must never be distributed to console users. Use a production
+  KMS-managed encryption master key and an externally reachable
+  `PUBLIC_BASE_URL` before deployment. Mainnet remains gated on third-party
+  review and live x402 conformance evidence.
+</Warning>
+
+## Authentication and API keys
+
+1. `POST /v1/auth/challenge` returns a five-minute, single-use Stellar transaction challenge.
+2. The wallet signs the XDR without broadcasting it.
+3. `POST /v1/auth/verify` verifies the exact transaction hash and wallet signature, consumes the challenge, and returns a 24-hour session.
+4. `/v1/api-keys` creates, lists, rotates, and revokes personal keys. Key plaintext is returned only on creation or rotation.
+5. Session and personal-key middleware resolves a stable user ID used to scope every wrapper, vault secret, log, payment, and quota record.
+
+## Management API
+
+- `POST /v1/wrappers`, `GET /v1/wrappers`, and `PATCH /v1/wrappers/:id`
+- `POST /v1/wrappers/:id/enable` and `/disable`
+- `DELETE /v1/wrappers/:id`
+- `GET /v1/wrappers/:id/analytics`
+- `POST /v1/vault/secrets` and `GET /v1/vault/secrets`
+- `ANY /gateway/:slug/*` for paid proxy traffic
+
+Management endpoints accept a wallet session, a personal `al_live_` API key, or a separately configured administrative key. The public gateway never accepts management credentials as upstream authorization.
+
+## Intended guarantees
+
+- No credential is returned to the buyer.
+- The upstream is called only after valid payment authorization.
+- Settlement and delivery have an explicit failure policy.
+- Wrapped resources publish valid Bazaar metadata.
+- Egress cannot reach loopback, link-local, private, metadata, or internal network addresses.
+- Redirects are rejected and DNS is revalidated and pinned to a validated public address for the outbound connection.
+- Requests, outcomes, latency, byte counts, and settlements produce secret-free audit records.

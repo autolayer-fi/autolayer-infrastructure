@@ -1,0 +1,40 @@
+---
+title: "Production deployment"
+description: "Build, migrate, release, scale, and roll back AutoLayer safely."
+---
+
+## Recommended topology
+
+- Static web artifacts behind a CDN/WAF.
+- Multiple stateless API replicas behind a load balancer.
+- Dedicated Agenda worker capacity for scheduled execution.
+- Highly available PostgreSQL with backups and point-in-time recovery.
+- Independent testnet and pubnet RPC health checks.
+- KMS-delivered encryption and signer material.
+
+## Release sequence
+
+1. Build immutable API and web artifacts with `pnpm build`.
+2. Run unit, integration, wire-conformance, and dependency-license checks.
+3. Back up PostgreSQL and execute `pnpm migrate` as one pre-deploy job.
+4. Roll out API replicas with readiness gated on database access.
+5. Start workers after API schema compatibility is confirmed.
+6. Deploy the static site with `VITE_API_URL` and `VITE_CONSOLE_URL` fixed at build time.
+7. Run a testnet wallet-auth, automation, x402, Bazaar, and xWrapper smoke suite.
+8. Verify signer balances, queue lag, settlement latency, and error reasons before enabling pubnet traffic.
+
+## Horizontal scaling
+
+API replicas are stateless after authentication tokens are hashed into PostgreSQL. Rate and quota counters use atomic database updates. Agenda and advisory locks coordinate workers, but high settlement throughput also needs channel accounts or another signer-selection strategy to avoid one Stellar sequence-number bottleneck.
+
+## Rollback
+
+Application rollback is safe only while the prior binary understands the migrated schema. Prefer additive migrations and expand/migrate/contract releases. Never roll back confirmed Stellar effects; reconcile them and correct application state with an auditable forward operation.
+
+## Mainnet gates
+
+- Third-party security review with findings resolved.
+- Canonical client conformance on `stellar:testnet` and `stellar:pubnet`.
+- Published confirmed transaction hashes for every advertised scheme/network.
+- KMS-backed secrets, tested rotation, backups, alerting, runbooks and incident ownership.
+- Origin ownership protection for unrestricted Bazaar cataloging.

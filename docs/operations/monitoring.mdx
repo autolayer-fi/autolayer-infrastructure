@@ -1,0 +1,34 @@
+---
+title: "Monitoring and incident response"
+description: "Signals, alerts, degraded modes, reconciliation, and operational runbooks."
+---
+
+## Service-level signals
+
+Track request rate, latency and errors by route; PostgreSQL saturation; RPC simulation/send/confirmation latency; signer balance and sequence contention; Agenda depth, lock age and schedule lag; automation outcomes; verification rejection reason; settlement duration; Bazaar soft drops and zero-result searches; gateway upstream latency; quota rejection rate; and xVault decryption failures.
+
+## Minimum alerts
+
+- API readiness or PostgreSQL connectivity failure.
+- Settlement timeout or elevated `invalidReason`/`errorReason` rate.
+- Paymaster or relayer balance below the configured runway.
+- Worker schedule lag beyond one polling interval.
+- Repeated automation failure for one policy.
+- Catalog write/search failure.
+- Gateway SSRF rejection spike, upstream timeout spike, or quota counter failure.
+- Encryption-key version mismatch.
+
+## Degraded modes
+
+| Dependency | Expected behavior |
+| --- | --- |
+| PostgreSQL unavailable | Readiness fails; mutations and scheduling stop |
+| One Stellar RPC unavailable | Mark that network unavailable; keep the other independently visible |
+| Facilitator verification failure | Never proxy or deliver the protected resource |
+| Settlement timeout | Treat as indeterminate and reconcile by transaction state |
+| Bazaar indexing degraded | Settlement may continue; return explicit catalog soft-drop result |
+| Upstream API degraded | Record paid delivery failure according to the configured refund/response policy |
+
+## Incident evidence
+
+Preserve correlation IDs, route, user/wrapper IDs, network, public transaction hashes, status transitions and redacted reason codes. Never retain signed auth entries, payment signatures, bearer tokens, vault plaintext, delegate secrets, or injected authorization headers.

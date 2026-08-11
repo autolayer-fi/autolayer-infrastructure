@@ -1,0 +1,35 @@
+---
+title: "Agent Skills"
+description: "Versioned financial action contracts for agents that should not need Stellar tooling."
+---
+
+Agent Skills describe intent-level actions using deterministic JSON rather than Stellar SDK calls, CLI commands, RPC methods, or XDR. Each specification contains:
+
+- Stable slug, semantic version, protocol and category.
+- Explicit `stellar:testnet` and/or `stellar:pubnet` support.
+- Authentication mode and safety requirements.
+- Named actions with JSON input and output schemas.
+- Machine-readable error codes, descriptions and retryability.
+- Catalog, specification and MCP endpoints.
+
+Initial skills cover Stellar payments, Soroban invocation, Aquarius swaps, and scheduled disbursements.
+
+## Discover
+
+```bash
+curl 'http://localhost:5001/v1/skills?query=swap&network=stellar:testnet'
+curl http://localhost:5001/v1/skills/soroban-invoke/spec
+```
+
+Filters are `query`, `protocol`, `network`, and `action`. Unknown slugs return `SKILL_NOT_FOUND`.
+
+## Agent behavior
+
+1. Search by user intent.
+2. Select a skill supporting the required network.
+3. Validate proposed input against the named action schema.
+4. Respect `simulationRequired`, `walletAuthorizationRequired`, and `networkMustBeExplicit`.
+5. Request a wallet signature only after presenting the simulated effect.
+6. Branch on the returned error code and `retryable` value; never parse prose to decide whether to retry.
+
+The console Skills tab provides filters, readable safety/action/error views, and a copyable raw specification for integration testing.

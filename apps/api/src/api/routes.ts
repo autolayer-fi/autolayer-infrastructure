@@ -44,8 +44,137 @@ import {
 import { getUsdcContract } from "../constants/assets.js";
 
 import { getAquariusRouterContract } from "../constants/aquarius.js";
+import {
+  facilitator,
+  parseFacilitatorBody,
+} from "../services/x402-facilitator.js";
+import {
+  catalogPayment,
+  listResources,
+  searchResources,
+} from "../services/bazaar.js";
 
 export const routes: ExpressRouter = Router();
+
+function discoveryFilters(query: Record<string, unknown>) {
+  const number = (value: unknown, fallback: number, max: number) =>
+    Math.min(Math.max(Number(value) || fallback, 0), max);
+  return {
+    type: typeof query.type === "string" ? query.type : undefined,
+    payTo: typeof query.payTo === "string" ? query.payTo : undefined,
+    scheme: typeof query.scheme === "string" ? query.scheme : undefined,
+    network: typeof query.network === "string" ? query.network : undefined,
+    extensions:
+      typeof query.extensions === "string" ? query.extensions : undefined,
+    limit: number(query.limit, 20, 100),
+    offset: number(query.offset, 0, 1_000_000),
+  };
+}
+
+function extensionResponse(
+  outcome: Awaited<ReturnType<typeof catalogPayment>>,
+) {
+  return Buffer.from(JSON.stringify({ bazaar: outcome })).toString("base64");
+}
+
+routes.get("/supported", (_request, response) =>
+  response.json(facilitator.getSupported()),
+);
+routes.post("/verify", async (request, response) => {
+  try {
+    const { paymentPayload, paymentRequirements } = parseFacilitatorBody(
+      request.body,
+    );
+    const result = await facilitator.verify(
+      paymentPayload,
+      paymentRequirements,
+    );
+    if (!result.isValid && !result.invalidReason)
+      result.invalidReason = "PAYMENT_VERIFICATION_FAILED";
+    response.setHeader(
+      "EXTENSION-RESPONSES",
+      extensionResponse({
+        success: false,
+        reason: "Cataloging occurs only after successful settlement",
+      }),
+    );
+    return response.json(result);
+  } catch (error) {
+    return response
+      .status(400)
+      .json({
+        isValid: false,
+        invalidReason: "INVALID_REQUEST",
+        invalidMessage:
+          error instanceof Error
+            ? error.message
+            : "Invalid facilitator request",
+      });
+  }
+});
+routes.post("/settle", async (request, response) => {
+  try {
+    const { paymentPayload, paymentRequirements } = parseFacilitatorBody(
+      request.body,
+    );
+    const result = await facilitator.settle(
+      paymentPayload,
+      paymentRequirements,
+    );
+    if (!result.success && !result.errorReason)
+      result.errorReason = "PAYMENT_SETTLEMENT_FAILED";
+    const catalog = result.success
+      ? await catalogPayment(paymentPayload, paymentRequirements)
+      : {
+          success: false as const,
+          reason: result.errorReason || "Settlement failed",
+        };
+    response.setHeader("EXTENSION-RESPONSES", extensionResponse(catalog));
+    return response.json(result);
+  } catch (error) {
+    return response
+      .status(400)
+      .json({
+        success: false,
+        errorReason: "INVALID_REQUEST",
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : "Invalid facilitator request",
+        transaction: "",
+        network: "stellar:testnet",
+      });
+  }
+});
+routes.get("/discovery/resources", async (request, response, next) => {
+  try {
+    return response.json(await listResources(discoveryFilters(request.query)));
+  } catch (error) {
+    next(error);
+  }
+});
+routes.get("/discovery/search", async (request, response, next) => {
+  try {
+    const query =
+      typeof request.query.query === "string" ? request.query.query.trim() : "";
+    if (!query)
+      return response
+        .status(400)
+        .json({ error: "query is required", code: "QUERY_REQUIRED" });
+    const cursor =
+      typeof request.query.cursor === "string"
+        ? Number(Buffer.from(request.query.cursor, "base64url").toString())
+        : 0;
+    return response.json(
+      await searchResources(query, {
+        ...discoveryFilters(request.query),
+        offset: Number.isSafeInteger(cursor) && cursor >= 0 ? cursor : 0,
+      }),
+    );
+  } catch (error) {
+    next(error);
+  }
+});
 
 interface PolicyRules {
   permissions: ProtocolPermission[];
@@ -62,9 +191,21 @@ interface PolicyRules {
 }
 
 function buildPolicyRules(
-  proposal: ReturnType<typeof proposalSchema.parse>
+  proposal: ReturnType<typeof proposalSchema.parse>,
 ): PolicyRules {
   switch (proposal.type) {
+    case "CONTRACT_CALL":
+      return {
+        permissions: [
+          {
+            contract: proposal.strategy.contractId,
+            function: proposal.strategy.functionName,
+          },
+        ],
+        limits: [],
+        sessionMaxUses: proposal.maxUses,
+      };
+
     case "DCA": {
       const expectedRouter = getAquariusRouterContract(proposal.network);
 
@@ -74,7 +215,7 @@ function buildPolicyRules(
 
       if (proposal.strategy.protocol.contractId !== expectedRouter) {
         throw new Error(
-          `Invalid Aquarius router for ${proposal.network}. Expected ${expectedRouter}`
+          `Invalid Aquarius router for ${proposal.network}. Expected ${expectedRouter}`,
         );
       }
 
@@ -137,7 +278,7 @@ function buildPolicyRules(
 
       if (proposal.strategy.protocol.contractId !== expectedRouter) {
         throw new Error(
-          `Invalid Aquarius router for ${proposal.network}. Expected ${expectedRouter}`
+          `Invalid Aquarius router for ${proposal.network}. Expected ${expectedRouter}`,
         );
       }
 
@@ -185,12 +326,12 @@ function buildPolicyRules(
       }
 
       const amounts = proposal.strategy.recipients.map((recipient) =>
-        BigInt(recipient.amount)
+        BigInt(recipient.amount),
       );
 
       const maxPerCall = amounts.reduce(
         (maximum, amount) => (amount > maximum ? amount : maximum),
-        0n
+        0n,
       );
 
       const totalPerRun = amounts.reduce((total, amount) => total + amount, 0n);
@@ -230,7 +371,7 @@ function buildPolicyRules(
             asset: proposal.strategy.asset,
 
             recipients: proposal.strategy.recipients.map(
-              (recipient) => recipient.address
+              (recipient) => recipient.address,
             ),
 
             max_per_call: maxPerCall.toString(),
@@ -362,8 +503,8 @@ function deriveAutomationState(automation: Automation): {
       automation.paymentStatus === "PAID"
         ? "READY_TO_ACTIVATE"
         : automation.paymentStatus === "REQUIRED"
-        ? "PAYMENT_REQUIRED"
-        : "PROPOSED",
+          ? "PAYMENT_REQUIRED"
+          : "PROPOSED",
     isTerminal: false,
     isPaused: false,
     isCancelled: false,
@@ -389,7 +530,7 @@ function publicAutomation(automation: Automation) {
       {
         key: env.masterKey,
         version: env.KEY_ENCRYPTION_VERSION,
-      }
+      },
     ).toString(),
     strategy: automation.strategy,
     schedule: automation.schedule,
@@ -478,7 +619,7 @@ routes.post("/v1/automations/proposals", async (request, response, next) => {
 
     if (scheduledRuns === null) {
       throw new Error(
-        "A finite maxUses is required when pricing automation per run"
+        "A finite maxUses is required when pricing automation per run",
       );
     }
 
@@ -508,7 +649,7 @@ routes.post("/v1/automations/proposals", async (request, response, next) => {
           key: env.masterKey,
 
           version: env.KEY_ENCRYPTION_VERSION,
-        }
+        },
       ),
 
       delegatePrivateKeyEncrypted: encryptValue(
@@ -518,7 +659,7 @@ routes.post("/v1/automations/proposals", async (request, response, next) => {
           key: env.masterKey,
 
           version: env.KEY_ENCRYPTION_VERSION,
-        }
+        },
       ),
 
       policyInput: material.input,
@@ -562,7 +703,7 @@ routes.post("/v1/automations/proposals", async (request, response, next) => {
       paymentTreasury: env.TREASURY_G_ACCOUNT,
 
       paymentQuoteExpiresAt: new Date(
-        Date.now() + env.X402_QUOTE_TTL_SECONDS * 1000
+        Date.now() + env.X402_QUOTE_TTL_SECONDS * 1000,
       ),
 
       paymentTxHash: null,
@@ -614,7 +755,7 @@ routes.post("/v1/automations/proposals", async (request, response, next) => {
       delegatePublicKey: delegateKeypair.publicKey(),
 
       delegatePublicKeyRawHex: Buffer.from(
-        delegateKeypair.rawPublicKey()
+        delegateKeypair.rawPublicKey(),
       ).toString("hex"),
 
       delegatePopHex: automation.delegatePopHex,
@@ -674,7 +815,7 @@ routes.post(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 routes.post(
@@ -714,19 +855,19 @@ routes.post(
       const settled = await settlePayment(
         automation,
         paymentSessionId,
-        signedAuthEntriesXdr
+        signedAuthEntriesXdr,
       );
 
       response.setHeader(
         "PAYMENT-RESPONSE",
-        Buffer.from(JSON.stringify(settled)).toString("base64")
+        Buffer.from(JSON.stringify(settled)).toString("base64"),
       );
 
       return response.json(settled);
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 /*
@@ -837,14 +978,14 @@ routes.post("/v1/automations/:id/activate", async (request, response, next) => {
       automation.schedule.expression,
       automation.schedule.timezone,
       firstRunAt,
-      automation.maxUses
+      automation.maxUses,
     );
 
     await activateAutomation(
       automation.id,
       input.policyIdHex.toLowerCase(),
       input.transactionHash,
-      jobId
+      jobId,
     );
 
     return response.json({
@@ -1019,7 +1160,7 @@ routes.post("/v1/automations/:id/resume", async (request, response, next) => {
       automation.schedule.expression,
       automation.schedule.timezone,
       resumeFirstRunAt,
-      automation.maxUses
+      automation.maxUses,
     );
 
     await setStatus(automation.id, "ACTIVE");

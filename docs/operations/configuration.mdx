@@ -1,0 +1,39 @@
+---
+title: "Configuration"
+description: "Environment variables, signer separation, limits, and production secret handling."
+---
+
+AutoLayer validates configuration before opening its listener. Start from `apps/api/.env.example`; do not copy development values into production.
+
+## Core service
+
+| Variable | Purpose |
+| --- | --- |
+| `NODE_ENV` | Runtime mode; use `production` for deployed services |
+| `PORT` | API listener, default `5001` |
+| `DATABASE_URL` | PostgreSQL connection string with TLS in production |
+| `CORS_ORIGINS` | Comma-separated trusted web origins |
+| `PUBLIC_BASE_URL` | Externally reachable API/gateway origin |
+| `HTTP_TIMEOUT_MS` | Bound for RPC and upstream operations |
+
+## Cryptography and signing
+
+| Variable | Purpose |
+| --- | --- |
+| `KEY_ENCRYPTION_MASTER_KEY` | Base64-encoded 32-byte AES key |
+| `KEY_ENCRYPTION_VERSION` | Ciphertext key version for controlled rotation |
+| `AUTOMATION_PAYMASTER_SECRET` | Fee-paying signer for scheduled execution |
+| `PAYMENT_RELAYER_SECRET` | Facilitator signer and fee payer |
+| `TREASURY_G_ACCOUNT` | Recipient of automation activation charges |
+
+The paymaster and relayer must be distinct funded accounts. Production deployments should load them through workload identity and KMS/HSM-backed secret delivery instead of checked-in files.
+
+## Networks and pricing
+
+`STELLAR_MAINNET_RPC_URL` selects pubnet RPC. Testnet and pubnet remain explicit in every request. `X402_MAX_TRANSACTION_FEE_STROOPS` is a hard settlement ceiling; per-automation prices and quote TTL are separately configurable.
+
+## Scheduler and gateway
+
+Agenda polling, concurrency, and lock lifetime must be tuned together. A job lock must exceed the expected simulation/submission/confirmation path. xWrapper request size, response size, timeout, rate, monthly quota, and redirect policy are enforced server-side.
+
+<Warning>Keep `XWRAPPER_API_KEYS` for administrative or self-hosted operator access. Browser users authenticate through wallet sessions and personal API keys.</Warning>

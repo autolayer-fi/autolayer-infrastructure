@@ -1,0 +1,39 @@
+---
+title: "Local quickstart"
+description: "Run the website, console, PostgreSQL, scheduler, and API."
+---
+
+## Requirements
+
+- Node.js 22 or later
+- pnpm 10.34 or later
+- Docker with Compose
+- A wallet supported by Stellar Wallets Kit; SEP-43 capability is required for auth-entry signing
+
+## Start the stack
+
+```bash
+cd autolayer-core
+pnpm install
+pnpm setup:dev
+docker compose up -d postgres
+pnpm migrate
+pnpm dev
+```
+
+`pnpm setup:dev` creates `apps/api/.env` once with random, unfunded development accounts. It never overwrites an existing file.
+
+<Warning>
+Generated keys are for `EXECUTION_MODE=mock`. Fund separate paymaster and relayer accounts and explicitly select live execution before sending real payments.
+</Warning>
+
+## Confirm the services
+
+```bash
+curl http://localhost:5001/health
+curl http://localhost:5001/supported
+curl http://localhost:5001/discovery/resources
+curl http://localhost:5001/v1/skills
+```
+
+Open `http://localhost:5173/console` and select a wallet from the Stellar Wallets Kit modal. Transaction construction happens in the browser, approval happens in the selected wallet, and the signed envelope is submitted to the selected Stellar network. AutoLayer restores the kit session with `getAddress()` instead of trusting a cached address string.

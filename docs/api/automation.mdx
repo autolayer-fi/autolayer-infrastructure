@@ -1,0 +1,35 @@
+---
+title: "Automation API"
+description: "Proposal, payment, activation, scheduling, and lifecycle endpoints."
+---
+
+## Endpoints
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/v1/automations/proposals` | Validate, price, persist, and return session material |
+| `GET` | `/v1/automations` | List wallet-owned automations with network filtering and pagination |
+| `GET` | `/v1/automations/:id` | Read lifecycle, payment, schedule, and execution state |
+| `POST` | `/v1/automations/:id/payment/prepare` | Prepare activation payment authorization |
+| `POST` | `/v1/automations/:id/payment/settle` | Settle a wallet-signed authorization entry |
+| `POST` | `/v1/automations/:id/activate` | Verify policy creation and schedule work |
+| `POST` | `/v1/automations/:id/pause` | Stop future job execution |
+| `POST` | `/v1/automations/:id/resume` | Restore scheduling if policy and limits permit |
+| `POST` | `/v1/automations/:id/cancel` | Revoke future execution |
+
+## Proposal types
+
+- `CONTRACT_CALL`: typed generic Soroban invocation with a contract/function-scoped session.
+- `DCA`: bounded Aquarius strict-send swap.
+- `REBALANCE`: target-weight analysis and bounded Aquarius execution.
+- `DISBURSEMENT`: one or more SEP-41 transfers with recipient and total limits.
+
+Schedules use `{ kind: "CRON" | "INTERVAL", expression, timezone }`. Finite `maxUses` is required while activation is priced per run.
+
+## State model
+
+`PROPOSED` → `PAYMENT_REQUIRED` → `READY_TO_ACTIVATE` → `ACTIVE`. Active automations may become `PAUSED`, `COMPLETED`, `CANCELLED`, `FAILED`, or `EXPIRED`. A failed run stores `lastError`; it does not silently bypass authorization or financial limits.
+
+## Idempotency and uncertainty
+
+Payment session records prevent replay of successful activation settlement. A network timeout after submission is indeterminate: query the transaction and automation state before creating a replacement authorization.

@@ -14,9 +14,9 @@ import { decryptValue } from "../services/crypto.js";
 
 import type {
   Automation,
+  ContractCallStrategy,
   DcaStrategy,
   DisbursementStrategy,
-
 } from "../api/types.js";
 
 import { env } from "../config/env.js";
@@ -36,6 +36,8 @@ type PlannedCallArgument =
   | { type: "address"; value: string }
   | { type: "i128"; value: string }
   | { type: "u128"; value: string }
+  | { type: "string" | "symbol"; value: string }
+  | { type: "bool"; value: boolean }
   | { type: "scval"; value: string; encoding: "base64" };
 
 interface PlannedCallMetadata {
@@ -89,7 +91,7 @@ class UnsignedRouteSimulationError extends Error {
     originalError: string;
   }) {
     super(
-      `Aquarius unsigned route simulation failed at max depth ${input.maxDepth}: ${input.originalError}`
+      `Aquarius unsigned route simulation failed at max depth ${input.maxDepth}: ${input.originalError}`,
     );
     this.name = "UnsignedRouteSimulationError";
     this.maxDepth = input.maxDepth;
@@ -102,6 +104,8 @@ const AQUARIUS_DEPTH_ORDER: readonly AquariusMaxDepth[] = [3, 2, 1];
 
 function amountFor(automation: Automation): string {
   switch (automation.type) {
+    case "CONTRACT_CALL":
+      return "0";
     case "DCA":
       return (automation.strategy as DcaStrategy).amountPerRun;
 
@@ -117,6 +121,18 @@ function amountFor(automation: Automation): string {
 
 function plannedCallsForNonDca(automation: Automation): PlannedCall[] {
   switch (automation.type) {
+    case "CONTRACT_CALL": {
+      const strategy = automation.strategy as ContractCallStrategy;
+      return [
+        {
+          contractId: strategy.contractId,
+          functionName: strategy.functionName,
+          accountingAmount: "0",
+          args: strategy.args,
+        },
+      ];
+    }
+
     case "DISBURSEMENT": {
       const strategy = automation.strategy as DisbursementStrategy;
 
@@ -146,7 +162,7 @@ function plannedCallsForNonDca(automation: Automation): PlannedCall[] {
 
 async function buildAquariusDcaCall(
   automation: Automation,
-  maxDepth: AquariusMaxDepth
+  maxDepth: AquariusMaxDepth,
 ): Promise<PlannedCall> {
   if (automation.type !== "DCA") {
     throw new Error("Expected a DCA automation");
@@ -165,7 +181,7 @@ async function buildAquariusDcaCall(
 
   if (strategy.protocol.contractId !== config.routerContractId) {
     throw new Error(
-      `Invalid Aquarius router for ${automation.network}. Expected ${config.routerContractId}`
+      `Invalid Aquarius router for ${automation.network}. Expected ${config.routerContractId}`,
     );
   }
 
@@ -204,7 +220,7 @@ async function buildAquariusRebalanceCall(
   automation: Automation,
   server: rpc.Server,
   paymaster: Keypair,
-  maxDepth: AquariusMaxDepth
+  maxDepth: AquariusMaxDepth,
 ): Promise<
   | { status: "SKIPPED"; reason: string; analysis: RebalanceAnalysis }
   | { status: "READY"; call: PlannedCall }
@@ -265,6 +281,15 @@ function argumentToScVal(argument: PlannedCallArgument): xdr.ScVal {
     case "u128":
       return nativeToScVal(BigInt(argument.value), { type: "u128" });
 
+    case "string":
+      return nativeToScVal(argument.value, { type: "string" });
+
+    case "symbol":
+      return nativeToScVal(argument.value, { type: "symbol" });
+
+    case "bool":
+      return nativeToScVal(argument.value, { type: "bool" });
+
     case "scval":
       return xdr.ScVal.fromXDR(argument.value, argument.encoding);
   }
@@ -272,7 +297,7 @@ function argumentToScVal(argument: PlannedCallArgument): xdr.ScVal {
 
 function sessionAuthorizationScVal(
   policyIdHex: string,
-  delegateSignature: Buffer
+  delegateSignature: Buffer,
 ): xdr.ScVal {
   if (!/^[0-9a-fA-F]{64}$/.test(policyIdHex)) {
     throw new Error("Policy ID must be a 32-byte hex string");
@@ -296,7 +321,7 @@ function sessionAuthorizationScVal(
 
 function walletSessionAuthScVal(
   policyIdHex: string,
-  delegateSignature: Buffer
+  delegateSignature: Buffer,
 ): xdr.ScVal {
   return xdr.ScVal.scvVec([
     xdr.ScVal.scvSymbol("Session"),
@@ -305,7 +330,7 @@ function walletSessionAuthScVal(
 }
 
 function getAddressCredentials(
-  entry: xdr.SorobanAuthorizationEntry
+  entry: xdr.SorobanAuthorizationEntry,
 ): xdr.SorobanAddressCredentials {
   const credentials = entry.credentials();
 
@@ -322,7 +347,7 @@ function getAddressCredentials(
 function buildAuthorizationPayload(
   entry: xdr.SorobanAuthorizationEntry,
   automation: Automation,
-  signatureExpirationLedger: number
+  signatureExpirationLedger: number,
 ): Buffer {
   const credentials = getAddressCredentials(entry);
   const networkId = hash(Buffer.from(Networks[automation.network]));
@@ -333,7 +358,7 @@ function buildAuthorizationPayload(
       nonce: credentials.nonce(),
       signatureExpirationLedger,
       invocation: entry.rootInvocation(),
-    })
+    }),
   );
 
   return hash(preimage.toXDR());
@@ -343,7 +368,7 @@ function signSessionAuthorizationEntry(
   entry: xdr.SorobanAuthorizationEntry,
   delegate: Keypair,
   automation: Automation,
-  signatureExpirationLedger: number
+  signatureExpirationLedger: number,
 ): xdr.SorobanAuthorizationEntry {
   if (!automation.onchainPolicyIdHex) {
     throw new Error("Automation has no on-chain policy");
@@ -353,13 +378,13 @@ function signSessionAuthorizationEntry(
   const payload = buildAuthorizationPayload(
     entry,
     automation,
-    signatureExpirationLedger
+    signatureExpirationLedger,
   );
   const delegateSignature = delegate.sign(payload);
 
   credentials.signatureExpirationLedger(signatureExpirationLedger);
   credentials.signature(
-    walletSessionAuthScVal(automation.onchainPolicyIdHex, delegateSignature)
+    walletSessionAuthScVal(automation.onchainPolicyIdHex, delegateSignature),
   );
 
   return entry;
@@ -369,7 +394,7 @@ function buildCallTransaction(
   sourceAccount: Awaited<ReturnType<rpc.Server["getAccount"]>>,
   call: PlannedCall,
   automation: Automation,
-  auth: xdr.SorobanAuthorizationEntry[] = []
+  auth: xdr.SorobanAuthorizationEntry[] = [],
 ) {
   const contractAddress = Address.fromString(call.contractId).toScAddress();
   const invokeContractArgs = new xdr.InvokeContractArgs({
@@ -391,7 +416,7 @@ function buildCallTransaction(
 
 function getSuccessfulUnsignedAuthEntries(
   simulation: rpc.Api.SimulateTransactionResponse,
-  call: PlannedCall
+  call: PlannedCall,
 ): xdr.SorobanAuthorizationEntry[] {
   if (rpc.Api.isSimulationError(simulation)) {
     if (call.metadata?.protocol === "AQUARIUS" && call.metadata.maxDepth) {
@@ -414,7 +439,7 @@ function getSuccessfulUnsignedAuthEntries(
 
 async function waitForTransaction(
   server: rpc.Server,
-  transactionHash: string
+  transactionHash: string,
 ): Promise<rpc.Api.GetSuccessfulTransactionResponse> {
   const deadline = Date.now() + env.HTTP_TIMEOUT_MS;
 
@@ -429,7 +454,7 @@ async function waitForTransaction(
       throw new Error(
         `Automation transaction failed: ${
           transaction.resultXdr ?? transactionHash
-        }`
+        }`,
       );
     }
 
@@ -437,7 +462,7 @@ async function waitForTransaction(
   }
 
   throw new Error(
-    `Timed out confirming automation transaction ${transactionHash}`
+    `Timed out confirming automation transaction ${transactionHash}`,
   );
 }
 
@@ -455,14 +480,14 @@ function loadDelegate(automation: Automation): Keypair {
     {
       key: env.masterKey,
       version: env.KEY_ENCRYPTION_VERSION,
-    }
+    },
   ).toString("utf8");
 
   const delegate = Keypair.fromSecret(secret);
 
   if (delegate.publicKey() !== expectedPublicKey) {
     throw new Error(
-      "Delegate private key does not match stored delegate public key"
+      "Delegate private key does not match stored delegate public key",
     );
   }
 
@@ -474,7 +499,7 @@ async function executeCallLive(
   paymaster: Keypair,
   delegate: Keypair,
   automation: Automation,
-  call: PlannedCall
+  call: PlannedCall,
 ): Promise<SubmittedCall> {
   if (!automation.onchainPolicyIdHex) {
     throw new Error("Missing on-chain policy ID");
@@ -484,19 +509,18 @@ async function executeCallLive(
   const unsignedTransaction = buildCallTransaction(
     initialSourceAccount,
     call,
-    automation
+    automation,
   );
-  const unsignedSimulation = await server.simulateTransaction(
-    unsignedTransaction
-  );
+  const unsignedSimulation =
+    await server.simulateTransaction(unsignedTransaction);
   const unsignedAuthEntries = getSuccessfulUnsignedAuthEntries(
     unsignedSimulation,
-    call
+    call,
   );
 
   if (unsignedAuthEntries.length !== 1) {
     throw new Error(
-      `Expected exactly one wallet auth entry, received ${unsignedAuthEntries.length}`
+      `Expected exactly one wallet auth entry, received ${unsignedAuthEntries.length}`,
     );
   }
 
@@ -512,7 +536,7 @@ async function executeCallLive(
     unsignedEntry,
     delegate,
     automation,
-    signatureExpirationLedger
+    signatureExpirationLedger,
   );
 
   const signedSourceAccount = await server.getAccount(paymaster.publicKey());
@@ -520,19 +544,19 @@ async function executeCallLive(
     signedSourceAccount,
     call,
     automation,
-    [signedAuthEntry]
+    [signedAuthEntry],
   );
   const signedSimulation = await server.simulateTransaction(signedTransaction);
 
   if (rpc.Api.isSimulationError(signedSimulation)) {
     throw new Error(
-      `Signed automation simulation failed: ${signedSimulation.error}`
+      `Signed automation simulation failed: ${signedSimulation.error}`,
     );
   }
 
   if (rpc.Api.isSimulationRestore(signedSimulation)) {
     throw new Error(
-      "Signed automation transaction requires ledger-entry restoration"
+      "Signed automation transaction requires ledger-entry restoration",
     );
   }
 
@@ -544,7 +568,7 @@ async function executeCallLive(
   const submitted = await server.sendTransaction(assembled);
   if (submitted.status === "ERROR") {
     throw new Error(
-      `Automation submission failed: ${JSON.stringify(submitted)}`
+      `Automation submission failed: ${JSON.stringify(submitted)}`,
     );
   }
 
@@ -580,7 +604,7 @@ async function executeAquariusDcaWithDepthFallback(input: {
         input.paymaster,
         input.delegate,
         input.automation,
-        call
+        call,
       );
     } catch (error) {
       if (!(error instanceof UnsignedRouteSimulationError)) {
@@ -601,7 +625,7 @@ async function executeAquariusDcaWithDepthFallback(input: {
   throw (
     lastRouteError ??
     new Error(
-      "Aquarius did not return an executable route at depths 3, 2, or 1"
+      "Aquarius did not return an executable route at depths 3, 2, or 1",
     )
   );
 }
@@ -610,12 +634,12 @@ function mockExecution(
   automation: Automation,
   runId: string,
   delegate: Keypair,
-  plannedCalls: PlannedCall[]
+  plannedCalls: PlannedCall[],
 ): AutomationExecutionResult {
   const transactionHash = `mock-${runId}`;
   const payload = Buffer.from(
     runId.replaceAll("-", "").padEnd(64, "0").slice(0, 64),
-    "hex"
+    "hex",
   );
   const amount = plannedCalls
     .reduce((total, call) => total + BigInt(call.accountingAmount), 0n)
@@ -646,7 +670,7 @@ function mockExecution(
 
 export async function executeAutomation(
   automation: Automation,
-  runId: string
+  runId: string,
 ): Promise<AutomationExecutionResult> {
   if (!automation.onchainPolicyIdHex) {
     throw new Error("Missing on-chain policy ID");
@@ -666,7 +690,7 @@ export async function executeAutomation(
           automation,
           server,
           paymaster,
-          maxDepth
+          maxDepth,
         );
 
         if (planned.status === "SKIPPED") {
@@ -698,7 +722,7 @@ export async function executeAutomation(
             paymaster,
             delegate,
             automation,
-            planned.call
+            planned.call,
           );
 
           return {
@@ -718,7 +742,7 @@ export async function executeAutomation(
               maxDepth: error.maxDepth,
               pools: error.pools,
               error: error.originalError,
-            }
+            },
           );
         }
       }
@@ -767,7 +791,7 @@ export async function executeAutomation(
 
     for (const call of plannedCalls) {
       submittedCalls.push(
-        await executeCallLive(server, paymaster, delegate, automation, call)
+        await executeCallLive(server, paymaster, delegate, automation, call),
       );
     }
 

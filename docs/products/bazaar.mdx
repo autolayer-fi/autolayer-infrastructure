@@ -1,0 +1,27 @@
+---
+title: "Bazaar discovery"
+description: "Automatically catalog and search paid HTTP endpoints and MCP tools."
+---
+
+The Bazaar is AutoLayer’s off-chain discovery layer for Stellar x402 resources. Sellers attach the standard discovery extension to payment requirements; after successful settlement, the facilitator validates and catalogs the listing without a separate registration step.
+
+## Resource model
+
+HTTP resources are keyed by URL. MCP tools are keyed by resource URL plus `input.toolName`. Listings retain service name, description, MIME type, tags, x402 version, accepted payment requirements, resource type, validated discovery data and last-update time.
+
+## Integrity boundary
+
+- Cataloging occurs only after successful settlement.
+- `@x402/extensions` performs discovery schema extraction.
+- Malformed metadata is soft-dropped rather than failing a valid payment.
+- `routeTemplate` requires percent-decoding and traversal validation.
+- Catalog outcome and reason are returned through `EXTENSION-RESPONSES`.
+- The index stays off-chain, avoiding rent and a second per-payment transaction.
+
+## Browse and search
+
+`GET /discovery/resources` provides deterministic filters and offset pagination. `GET /discovery/search` uses PostgreSQL weighted full-text retrieval, rank, freshness tie-breaking, opaque cursors and `partialResults`.
+
+Search quality should be evaluated with a maintained query/relevance set, zero-result rate, click or paid-call outcome, and regression checks when metadata conventions change.
+
+<Warning>Successful payment raises the cost of poisoning but does not prove control of a URL. Add DNS/origin ownership verification before unrestricted public catalog registration.</Warning>

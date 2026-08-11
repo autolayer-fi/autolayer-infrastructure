@@ -1,0 +1,39 @@
+---
+title: "Authentication API"
+description: "Wallet challenges, sessions, and personal AutoLayer API keys."
+---
+
+## Wallet challenge
+
+`POST /v1/auth/challenge`
+
+```json
+{ "address": "G...", "network": "TESTNET" }
+```
+
+Returns `challengeId`, `transactionXdr`, network, and a five-minute expiry. The transaction is an authentication proof only and must be signed without broadcasting.
+
+## Verify and create a session
+
+`POST /v1/auth/verify`
+
+```json
+{ "challengeId": "uuid", "signedXdr": "AAAA..." }
+```
+
+The backend verifies the exact envelope hash, source account, network and signature, consumes the challenge atomically, and returns a 24-hour bearer session. Reuse returns an error.
+
+Use `Authorization: Bearer <session>` for console management routes. `GET /v1/auth/me` resolves the current user; `POST /v1/auth/logout` revokes the session.
+
+## Personal API keys
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| `GET` | `/v1/api-keys` | List metadata; never returns plaintext |
+| `POST` | `/v1/api-keys` | Create a named key |
+| `POST` | `/v1/api-keys/:id/rotate` | Revoke old material and return a new key once |
+| `DELETE` | `/v1/api-keys/:id` | Revoke the key |
+
+Keys use the `al_live_` prefix. Only SHA-256 hashes are stored. Creation and rotation are the only responses containing plaintext.
+
+<Warning>`XWRAPPER_API_KEYS` is a separate administrative/operator mechanism. Do not expose it in a browser or give it to console users.</Warning>

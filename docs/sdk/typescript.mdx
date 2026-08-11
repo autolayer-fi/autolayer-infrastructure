@@ -1,0 +1,81 @@
+---
+title: "TypeScript SDK"
+description: "Configure the client, create automations, settle activation, and manage lifecycle state."
+---
+
+## Install
+
+```bash
+pnpm add @autolayer/sdk @stellar/stellar-sdk
+```
+
+## Configure
+
+```ts
+import { AutoLayer } from "@autolayer/sdk";
+
+AutoLayer.configure({ environment: "DEVELOPMENT" });
+// DEVELOPMENT -> http://localhost:5001
+// PRODUCTION  -> hosted AutoLayer API
+
+// Private or staging deployment
+AutoLayer.configure({ apiUrl: "https://core.example.com" });
+```
+
+The API deployment and Stellar network are separate choices. Every proposal must explicitly use `TESTNET` or `PUBLIC`; AutoLayer never infers mainnet from a wallet or API hostname.
+
+## Create a Soroban automation
+
+```ts
+const proposal = await AutoLayer.propose({
+  type: "CONTRACT_CALL",
+  network: "TESTNET",
+  walletAddress: smartAccount,
+  validAfterLedger: ledger,
+  expiresAtLedger: ledger + 17_280,
+  maxUses: 12,
+  schedule: { kind: "CRON", expression: "0 */6 * * *", timezone: "UTC" },
+  strategy: {
+    contractId,
+    functionName: "autolayer_run",
+    args: [
+      { type: "address", value: smartAccount },
+      { type: "u128", value: "10000000" },
+      { type: "bool", value: true }
+    ]
+  }
+});
+```
+
+Argument types are `address`, `i128`, `u128`, `string`, `symbol`, and `bool`. Integer values are decimal strings to preserve full Soroban precision in JavaScript.
+
+## Activation lifecycle
+
+1. `propose` persists the configuration and returns smart-account session material.
+2. The connected wallet invokes `create_session` with `createSessionArgsXdr`.
+3. `preparePayment` returns one unsigned SEP-43 authorization entry.
+4. The wallet signs the auth entry and `settlePayment` confirms the activation charge.
+5. `activate` verifies the on-chain policy and schedules the first run.
+
+```ts
+const prepared = await AutoLayer.preparePayment(proposal.automationId, {
+  payerAddress
+});
+
+const settlement = await AutoLayer.settlePayment(proposal.automationId, {
+  paymentSessionId: prepared.paymentSessionId,
+  signedAuthEntriesXdr: [signedEntry]
+});
+
+await AutoLayer.activate(proposal.automationId, {
+  policyIdHex: proposal.expectedPolicyIdHex,
+  transactionHash: sessionCreationHash,
+  firstRunAt: new Date().toISOString()
+});
+```
+
+<Warning>Never log signed auth entries, wallet challenge XDR, delegate material, or payment signatures.</Warning>
+
+## Lifecycle methods
+
+Use `get`, `fetchAll`, `pause`, `resume`, and `cancel` to observe and control persisted automations. Completion is derived when `runCount` reaches `maxUses`; cancellation revokes future scheduling but cannot reverse confirmed Stellar transactions.

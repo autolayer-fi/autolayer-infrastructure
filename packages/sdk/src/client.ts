@@ -19,8 +19,7 @@ import type {
 } from "./types.js";
 
 export const API_URLS = {
-  // PRODUCTION: "https://core.autolayer.fi",
-  PRODUCTION: "http://localhost:5001",
+  PRODUCTION: "https://core.autolayer.fi",
   DEVELOPMENT: "http://localhost:5001",
 } as const;
 

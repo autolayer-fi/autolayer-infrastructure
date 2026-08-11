@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "dev": "pnpm migrate && tsx watch src/index.ts",
@@ -17,6 +17,10 @@
   "dependencies": {
     "@agendajs/postgres-backend": "^3.0.5",
     "@stellar/stellar-sdk": "^15.1.0",
+    "@x402/core": "2.21.0",
+    "@x402/express": "2.21.0",
+    "@x402/extensions": "2.21.0",
+    "@x402/stellar": "2.21.0",
     "agenda": "6.2.5",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
@@ -25,6 +29,7 @@
     "pg": "^8.16.3",
     "pino": "^9.7.0",
     "pino-http": "^10.5.0",
+    "undici": "^7.29.0",
     "zod": "^4.0.5"
   },
   "devDependencies": {
@@ -32,6 +37,7 @@
     "@types/express": "^5.0.3",
     "@types/node": "^24.0.15",
     "@types/pg": "^8.15.4",
+    "prettier": "^3.9.6",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
