@@ -1,6 +1,6 @@
 # Convenience compose file. Run from apps/api with: docker compose up --build
 services:
-  postgres:
+  postgres-core:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: autolayer
@@ -27,7 +27,7 @@ services:
     ports:
       - "5001:5001"
     depends_on:
-      postgres:
+      postgres-core:
         condition: service_healthy
     command: sh -c "node dist/db/migrate.js && node dist/index.js"
 
