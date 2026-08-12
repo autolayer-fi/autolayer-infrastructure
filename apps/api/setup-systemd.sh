@@ -1,8 +1,8 @@
 #!/bin/bash
 
-SERVICE_NAME="autolayer-core"
-APP_DIR="/home/tinkerpal/autolayer-core/apps/api"
-REPO_URL="git@github.com:AutoLayerFi/autolayer-core.git"
+SERVICE_NAME="autolayer-infrastructure"
+APP_DIR="/home/tinkerpal/autolayer-infrastructure/apps/api"
+REPO_URL="git@github.com:autolayer-fi/autolayer-infrastructure.git"
 DOCKER_COMPOSE_BIN="/usr/bin/docker compose"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
