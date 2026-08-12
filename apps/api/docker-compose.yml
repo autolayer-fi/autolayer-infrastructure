@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_USER: autolayer
       POSTGRES_PASSWORD: autolayer
-      POSTGRES_DB: autolayer
+      POSTGRES_DB: core-autolayer
     ports:
       - "5437:5437"
     volumes:
