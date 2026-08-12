@@ -6,5 +6,5 @@ export const pool = new pg.Pool({
   max: 20,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 10_000,
-  ssl: env.NODE_ENV === "production" ? { rejectUnauthorized: true } : undefined,
+  ssl: env.DATABASE_SSL ? { rejectUnauthorized: true } : undefined,
 });
