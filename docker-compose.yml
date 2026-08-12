@@ -4,13 +4,13 @@ services:
     environment:
       POSTGRES_USER: autolayer
       POSTGRES_PASSWORD: autolayer
-      POSTGRES_DB: autolayer
+      POSTGRES_DB: core-autolayer
     ports:
       - "5437:5437"
     volumes:
       - autolayer_pg:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U autolayer -d autolayer"]
+      test: ["CMD-SHELL", "pg_isready -U autolayer -d core-autolayer"]
       interval: 5s
       timeout: 5s
       retries: 20
