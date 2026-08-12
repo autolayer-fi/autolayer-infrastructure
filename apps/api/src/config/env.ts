@@ -7,6 +7,10 @@ const schema = z.object({
 		.default("development"),
 	PORT: z.coerce.number().int().positive().default(5001),
 	DATABASE_URL: z.string().min(1),
+	DATABASE_SSL: z
+    .string()
+    .optional()
+    .transform((val) => val === "true"),
 	KEY_ENCRYPTION_MASTER_KEY: z.string().min(1),
 	KEY_ENCRYPTION_VERSION: z.coerce.number().int().positive().default(1),
 	CORS_ORIGINS: z.string().default("http://localhost:5173"),
