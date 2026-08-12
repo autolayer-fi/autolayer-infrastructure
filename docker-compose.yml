@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: autolayer
       POSTGRES_DB: autolayer
     ports:
-      - "5434:5432"
+      - "5434:5435"
     volumes:
       - autolayer_pg:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +22,7 @@ services:
     env_file:
       - ./apps/api/.env
     environment:
-      DATABASE_URL: postgresql://autolayer:autolayer@postgres:5432/autolayer
+      DATABASE_URL: postgresql://autolayer:autolayer@postgres:5435/autolayer
     ports:
       - "5001:5001"
     depends_on:
