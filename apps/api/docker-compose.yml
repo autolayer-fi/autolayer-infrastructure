@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: autolayer
       POSTGRES_DB: core-autolayer
     ports:
-      - "5437:5432"
+      - "5439:5432"
     volumes:
       - core_autolayer_pg:/var/lib/postgresql/data
     healthcheck:
