@@ -1,9 +1,17 @@
 export type Network = "TESTNET" | "PUBLIC";
 export type AutomationKind =
   "CONTRACT_CALL" | "DCA" | "REBALANCE" | "DISBURSEMENT";
+const configuredApiUrl = (
+  import.meta.env.VITE_API_URL as string | undefined
+)?.replace(/\/$/, "");
+
+// Vite variables are embedded at build time. A missing production variable must
+// never send visitors to their own loopback interface.
 const API_URL =
-  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ||
-  "http://localhost:5001";
+  configuredApiUrl ||
+  (import.meta.env.PROD
+    ? "https://core.autolayer.fi"
+    : "http://localhost:5001");
 
 export class ApiError extends Error {
   constructor(
