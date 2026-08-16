@@ -50,9 +50,12 @@ import {
 } from "../services/x402-facilitator.js";
 import {
   catalogPayment,
+  encodeCatalogOutcome,
   listResources,
   searchResources,
 } from "../services/bazaar.js";
+import { checkFacilitatorAccess } from "../services/facilitator-access.js";
+import { pool } from "../db/pool.js";
 
 export const routes: ExpressRouter = Router();
 
@@ -71,12 +74,6 @@ function discoveryFilters(query: Record<string, unknown>) {
   };
 }
 
-function extensionResponse(
-  outcome: Awaited<ReturnType<typeof catalogPayment>>,
-) {
-  return Buffer.from(JSON.stringify({ bazaar: outcome })).toString("base64");
-}
-
 routes.get("/supported", (_request, response) =>
   response.json(facilitator.getSupported()),
 );
@@ -85,6 +82,8 @@ routes.post("/verify", async (request, response) => {
     const { paymentPayload, paymentRequirements } = parseFacilitatorBody(
       request.body,
     );
+    const denied = checkFacilitatorAccess(request, paymentRequirements);
+    if (denied) return response.status(denied.includes("RATE") ? 429 : 401).json({ isValid: false, invalidReason: denied, invalidMessage: denied });
     const result = await facilitator.verify(
       paymentPayload,
       paymentRequirements,
@@ -93,7 +92,7 @@ routes.post("/verify", async (request, response) => {
       result.invalidReason = "PAYMENT_VERIFICATION_FAILED";
     response.setHeader(
       "EXTENSION-RESPONSES",
-      extensionResponse({
+      encodeCatalogOutcome({
         success: false,
         reason: "Cataloging occurs only after successful settlement",
       }),
@@ -117,6 +116,8 @@ routes.post("/settle", async (request, response) => {
     const { paymentPayload, paymentRequirements } = parseFacilitatorBody(
       request.body,
     );
+    const denied = checkFacilitatorAccess(request, paymentRequirements);
+    if (denied) return response.status(denied.includes("RATE") ? 429 : 401).json({ success: false, errorReason: denied, errorMessage: denied, transaction: "", network: paymentRequirements.network });
     const result = await facilitator.settle(
       paymentPayload,
       paymentRequirements,
@@ -129,7 +130,7 @@ routes.post("/settle", async (request, response) => {
           success: false as const,
           reason: result.errorReason || "Settlement failed",
         };
-    response.setHeader("EXTENSION-RESPONSES", extensionResponse(catalog));
+    response.setHeader("EXTENSION-RESPONSES", encodeCatalogOutcome(catalog));
     return response.json(result);
   } catch (error) {
     return response
@@ -173,6 +174,16 @@ routes.get("/discovery/search", async (request, response, next) => {
     );
   } catch (error) {
     next(error);
+  }
+});
+
+routes.get("/health/live", (_request, response) => response.json({ status: "ok" }));
+routes.get("/health/ready", async (_request, response) => {
+  try {
+    await pool.query("SELECT 1");
+    response.json({ status: "ready", facilitator: ["stellar:testnet", "stellar:pubnet"], bazaar: "ready" });
+  } catch {
+    response.status(503).json({ status: "not_ready", reason: "DATABASE_UNAVAILABLE" });
   }
 });
 
