@@ -1,6 +1,6 @@
 ---
 title: "Production technical architecture"
-description: "Components, trust boundaries, data models, protocols, execution flows, deployment topology, and current implementation status."
+description: "Stellar-specific x402 integration plan, components, trust boundaries, settlement schemes, discovery, conformance, and production delivery."
 ---
 
 ## System objective
@@ -27,6 +27,38 @@ flowchart TB
   Bazaar --> Postgres
 ```
 
+## RFP delivery boundary and Stellar integration
+
+This architecture directly addresses the **X402 Facilitator with Bazaar (Discovery) Support** RFP. The grant boundary is the x402 facilitator, Stellar-native Bazaar, MCP agent interface, Stellar `upto` contribution, SDKs, examples, conformance, security hardening, and production operation. AutoLayer's broader automation runtime remains available to the product but is not used to inflate the RFP scope or budget.
+
+The working MVP is deliberately separated from grant acceptance:
+
+| Capability | Demonstrated foundation | Grant-period production completion |
+| --- | --- | --- |
+| Exact facilitator | `@x402/stellar` registered for both CAIP-2 networks; stock-client testnet settlement published | Hosted testnet and pubnet, canonical e2e suite on both, public hashes and operational SLOs |
+| Bazaar | HTTP/MCP schema, filters, ranked search and native post-settlement cataloging implemented | Origin integrity, larger evaluation corpus, interoperability fixtures and production indexing |
+| MCP | Structured search and signature-forwarding paid call implemented | Wallet adapters, full discover/pay/retry examples, load and failure-mode validation |
+| `upto` | Draft network profile and non-custodial Soroban prototype deployed on testnet | TSC review, upstream adapters/fixtures, audit remediation and both-network conformance |
+| xWrapper/xVault2 | Persistent gateway, AES-256-GCM credential storage, quotas and analytics implemented | KMS custody, rotation, retention, circuit breaking and external review |
+| Security | Threat boundaries, hostile catalog tests and dependency-license gate implemented | Audit Bank review, findings remediation, penetration tests and mainnet production gate |
+
+### Selected building blocks
+
+| Building block | AutoLayer integration | Why it is used |
+| --- | --- | --- |
+| `@x402/core` | Canonical v2 client, facilitator, payload and response contracts | Prevents an AutoLayer-specific wire format |
+| Apache-2.0 `@x402/stellar` | Exact client and facilitator schemes for `stellar:testnet` and `stellar:pubnet` | Composes the maintained Stellar settlement implementation instead of reimplementing it |
+| `@x402/extensions/bazaar` | Seller declarations, extraction and schema validation | Keeps Stellar listings interoperable with the wider x402 discovery ecosystem |
+| `@stellar/stellar-sdk` and Soroban RPC | Simulation, auth-entry construction, submission, confirmation and reconciliation | Uses Stellar-native authorization and resource accounting |
+| Stellar Wallets Kit / SEP-43 | Explicit-network transaction and Soroban auth-entry signing | Supports browser wallets without handing keys to AutoLayer |
+| SEP-41 Stellar Asset Contracts | USDC by default and any compatible token in integer base units | Supports stablecoin micropayments while preserving seven-decimal accounting |
+| CAIP-2 | `stellar:testnet` and `stellar:pubnet` on every requirement and payload | Prevents implicit or ambiguous network selection |
+| MCP | Deterministic catalog search and paid-call tools | Makes discovery and purchase available inside agent runtimes |
+| PostgreSQL | Default off-chain catalog, search index, quotas and audit metadata | Avoids Soroban rent and a second transaction on the exact-payment hot path |
+| AutoLayer `upto` Soroban contract | Recipient-bound, cap-enforcing and nonce-consuming metered settlement | SEP-41 allowances alone cannot guarantee recipient binding or single settlement |
+
+The runtime dependency graph excludes the AGPL OpenZeppelin Relayer, its x402 plugin, and its SDK. The repository is Apache-2.0 and the dependency gate inventories reachable production packages before release.
+
 ## Repository layout
 
 ```text
@@ -36,6 +68,10 @@ autolayer-core/
 │   └── web/                 React + TypeScript + Tailwind site and console
 ├── packages/
 │   └── sdk/                 Published TypeScript client
+├── contracts/
+│   └── upto-settlement/     Non-custodial Soroban metered settlement contract
+├── specs/
+│   └── schemes/upto/        Draft Stellar network profile for upstream review
 ├── examples/
 │   └── autolayer-keeper/    Soroban automation interface example
 ├── docs/                    Mintlify documentation
@@ -102,11 +138,67 @@ The body is the canonical object:
 
 Every invalid response is normalized with a non-null machine-readable reason. Exact settlement validates the authorization structure, expiration ledger, token contract, amount, recipient, transfer event, and signature status through the upstream Stellar implementation.
 
+### Exact authorization and settlement flow
+
+```mermaid
+sequenceDiagram
+  participant B as Buyer / canonical client
+  participant W as Stellar wallet
+  participant S as Resource server
+  participant F as AutoLayer facilitator
+  participant R as Soroban RPC
+  B->>S: Request resource
+  S-->>B: 402 + PAYMENT-REQUIRED
+  B->>W: Sign Soroban authorization entry
+  W-->>B: Signed auth entry
+  B->>S: Retry + canonical PAYMENT-SIGNATURE
+  S->>F: POST /verify
+  F->>R: Read ledger and simulate invocation
+  F-->>S: Valid or non-null rejection reason
+  S->>F: POST /settle
+  F->>R: Re-verify, build, sponsor and submit
+  R-->>F: Confirmed transaction hash
+  F-->>S: Settlement response and extension outcomes
+  S-->>B: Resource + PAYMENT-RESPONSE
+```
+
+The buyer signs a Soroban authorization entry, not a pre-signed transaction. The canonical base64 `PaymentPayload` carries the upstream Stellar `payload: { transaction }` form verbatim. Verification binds the signature to the declared invocation tree, CAIP-2 network, SEP-41 token contract, integer amount, recipient and ledger expiration. Classic `G...` accounts use native signatures; custom contract accounts execute their `__check_auth` policy.
+
+`maxTimeoutSeconds` is converted to a bounded `signatureExpirationLedger` using current ledger cadence. Values use SEP-41 integer base units: seven decimal places means one unit is `0.0000001` token and no floating-point arithmetic is permitted. Seller onboarding checks that Classic recipients have the required trustline before advertising an issued asset.
+
+Settlement repeats all security-critical verification after simulation, enforces the configured resource-fee ceiling, submits through a dedicated fee-paying signer, waits for a final transaction result and returns its hash. Tampering changes the authorized invocation and fails signature validation. Expired authorizations fail closed. Production replay protection records authorization/transaction identities and confirmed outcomes; a timeout is reconciled against Stellar before any resubmission so an indeterminate result cannot become a double charge.
+
 ### Network behavior
 
 Testnet uses the upstream default Soroban RPC. Pubnet uses `STELLAR_MAINNET_RPC_URL`. Stellar identifiers are never inferred from the API environment. A payment explicitly selects one CAIP-2 network.
 
 The facilitator account requires XLM for inclusion and resource fees. Buyers require the payment asset but do not require XLM when fees are sponsored. Recipients of issued Classic assets must establish the relevant trustline; SEP-41 contract-account behavior depends on the token implementation.
+
+## Stellar `upto` settlement
+
+Metered services cannot know the final price when authorization is created. AutoLayer therefore proposes a Soroban contract-backed Stellar `upto` scheme rather than relying only on SEP-41 `approve` and `transfer_from`, which cannot independently guarantee recipient binding and single settlement.
+
+The current draft is in `specs/schemes/upto/scheme_upto_stellar.md`, with a testnet contract in `contracts/upto-settlement`. The payer authorizes a tuple containing the domain, CAIP-2 network, contract address, payer, token, fixed recipient, maximum amount, nonce, expiration ledger and facilitator. The actual amount is supplied at capture time, must be non-negative and no greater than the maximum, and is transferred directly from payer to recipient. The contract never takes custody.
+
+```mermaid
+sequenceDiagram
+  participant P as Payer / smart account
+  participant F as Facilitator
+  participant U as Upto contract
+  participant T as SEP-41 token
+  P-->>F: Auth entry bound to cap, recipient, nonce and expiry
+  F->>U: settle(actual amount, signed constraints)
+  U->>U: Check expiry, cap and unused payer nonce
+  U->>P: require_auth_for_args(signed constraints)
+  U->>F: require_auth()
+  U->>T: transfer(payer, recipient, actual)
+  U->>U: Persist consumed nonce and extend TTL
+  U-->>F: Settled actual amount
+```
+
+The consumed `(payer, nonce)` key prevents replay and is retained with a TTL beyond the authorization's validity window. The contract records no balance and adds no registry write to exact payments. Soroban simulation, instruction/memory/read/write ceilings and state-rent monitoring are required release checks. Smart accounts can add daily caps, token allowlists, approved facilitator/recipient sets and per-call limits inside `__check_auth` while preserving the protocol tuple.
+
+Grant-period integration includes finalizing the network specification with the x402 Technical Steering Committee, contributing client/facilitator adapters and fixtures to the upstream package, resolving review feedback, publishing deployments and settled hashes on testnet and pubnet, and completing contract/off-chain security review. AutoLayer will not advertise production `upto` support until those gates pass. Batch settlement and auth-capture remain explicitly compatible phase-two extensions and are outside this grant.
 
 ## Bazaar discovery
 
@@ -130,6 +222,24 @@ HTTP resources are keyed by URL. MCP resources are keyed by the tuple `resource 
 <Warning>
 Before an unrestricted public launch, catalog ownership needs an additional origin-control mechanism so an economically motivated payer cannot create the first listing for a URL it does not control. Successful settlement prevents free poisoning but does not by itself prove DNS or origin ownership.
 </Warning>
+
+### Catalog integrity
+
+Discovery processing is a soft-drop side effect: invalid metadata never changes payment settlement, but it is rejected from the catalog and its machine-readable outcome is returned through `EXTENSION-RESPONSES`. Validation checks the schema advertised by the extension, rejects unsupported external references, binds catalog payment terms to the successfully settled requirements, and never trusts client-echoed pricing independently.
+
+`routeTemplate` is percent-decoded before traversal and normalization checks, so encoded `..`, separators and ambiguous paths cannot bypass validation. HTTP identity is the normalized resource URL; MCP identity is the required tuple of resource URL and `input.toolName`. The production origin-control layer will use an HTTPS challenge or signed well-known document, with renewal and conflict rules, before allowing a listing to claim a public origin.
+
+### Search quality and evaluation
+
+The MVP uses PostgreSQL weighted full-text retrieval: service name and tags receive greater weight than descriptions and parameter text, ranking uses `ts_rank_cd`, and freshness is only a deterministic tie-breaker. Cursor pagination fetches one extra result to set `partialResults` accurately.
+
+A checked-in relevance set currently exercises ten natural-language queries over twelve representative resources. The recorded local baseline is nDCG@10 `0.9983`, MRR `1.0000`, recall@10 `1.0000`, with p95 query latency reported separately from ranking quality. During the grant this becomes a versioned, larger and adversarial corpus covering HTTP and MCP resources, misspellings, intent synonyms, network/asset filters and zero-result queries. CI will fail on agreed regression thresholds; production dashboards will track p50/p95 latency, zero-result rate and clicked/paid outcomes. Hybrid lexical/vector retrieval may be introduced only when measured results justify its operational cost.
+
+### Conformance upkeep and interoperability
+
+AutoLayer stores Bazaar data in the canonical x402 resource shape instead of a Stellar-only projection. Seller helpers emit per-parameter descriptions and the standard extension; buyer helpers consume the same pagination and resource fields used by other facilitators.
+
+The team will monitor x402 Foundation specification changes and Technical Steering Committee decisions, pin reviewed package versions, run scheduled compatibility tests against upstream main, and update fixtures when endpoint shapes, filters or cataloging rules evolve. Each release will include a wire-level diff review and cross-facilitator fixture run. This maintenance commitment continues through the grant period and the production handoff; the awarded implementation will not freeze discovery behavior at the award-date draft.
 
 ## Agent and skills interface
 
@@ -239,6 +349,73 @@ Production instrumentation should expose request latency and error rate by route
 
 Alerts should cover elevated invalid-reason rates, settlement confirmation timeout, low paymaster XLM balance, signer sequence contention, database saturation, scheduler lag, and catalog write failures.
 
+## Security threat and control map
+
+| Threat | Control and verification |
+| --- | --- |
+| Modified asset, amount, recipient or call | Upstream Stellar verification checks the signed Soroban invocation tree against payment requirements; negative tests mutate each field |
+| Replay or front-running | Exact auth is call-bound and ledger-expiring; confirmed identities are retained; `upto` additionally consumes a payer nonce |
+| Settlement timeout followed by duplicate submission | Mark outcome indeterminate, query transaction state and reconcile before resubmission |
+| Catalog poisoning or seller impersonation | Catalog only after settlement, validate echoed terms, soft-drop malformed data; public launch adds renewable HTTPS origin proof |
+| Encoded route traversal | Percent-decode before traversal, separator and normalization validation; hostile templates are regression-tested |
+| MCP/xWrapper SSRF | HTTPS-only catalog match, public DNS validation and address pinning, no redirects, bounded bodies and timeouts |
+| Credential disclosure | AES-256-GCM with contextual AAD, owner scoping, header/log redaction; production requires KMS and rotation |
+| Facilitator signer compromise | Separate relayer/paymaster identities, KMS-backed keys, configurable fee ceiling, rate limits and low-balance alerts |
+| Sequence contention under burst traffic | Channel signer pool or fee-bump separation, utilization metrics and deterministic reconciliation |
+| Soroban resource or TTL exhaustion | Preflight simulation, configured resource ceilings, consumed-nonce TTL monitoring and extension strategy |
+
+The grant-period threat model will enumerate assets, actors, entry points and abuse cases for `/verify`, `/settle`, discovery ingestion, MCP forwarding, operator APIs and the `upto` contract. It is delivered with the on-chain monitoring plan before mainnet. Audit Bank review covers the settlement path, authorization validation, discovery trust boundary and the `upto` contract; all critical/high findings block the production tag.
+
+## Wire conformance and acceptance matrix
+
+Acceptance is based on observable wire behavior, not internal implementation claims.
+
+Current reproducible evidence is recorded in the [dated RFP proof report](/conformance/evidence/rfp-proof-2026-08-16). It includes the canonical exact testnet transaction [`ed9fa12…b2e34`](https://stellar.expert/explorer/testnet/tx/ed9fa12d30ed28e5c478f9ee158e0eb7148069236504e06cfd55d718d95b2e34), the `upto` testnet [contract deployment](https://stellar.expert/explorer/testnet/tx/ac9378767a55d7384a270dbb4d73588eb5b6b7b3f28c4c3c5ddc1cd3602b729c) and [partial settlement](https://stellar.expert/explorer/testnet/tx/694d41f99865a418184b810c126cc7950f50df42b58040f560c1f011983a695b), search metrics, package versions and the verification transcript.
+
+| Acceptance item | Current evidence | Production exit criterion |
+| --- | --- | --- |
+| `/supported` | Both Stellar CAIP-2 networks registered with `areFeesSponsored: true` | Stock client reads hosted testnet and pubnet capability responses |
+| Canonical exact payload | `{ paymentPayload, paymentRequirements }` and nested `payload: { transaction }` covered by tests | Unmodified canonical client settles on both networks |
+| Exact settlement | Canonical testnet transaction evidence published | Confirmed public hash for testnet and pubnet plus upstream e2e transcript |
+| Rejections | Normalization tests require non-null machine-readable reasons | Contract test covers every rejection branch on hosted service |
+| Bazaar listing | Native post-settlement extension path and `EXTENSION-RESPONSES` tests | HTTP and MCP resources catalog automatically from canonical payments |
+| Catalog browse/search | Required filters, pagination, cursor and `partialResults` implemented | Interop fixtures and search-quality thresholds pass in CI |
+| `upto` | Draft profile, testnet contract and transaction evidence | Upstream-reviewed implementation; hashes and e2e on both networks |
+| Agent MCP | `tools/list`, search and signature-forwarding paid call implemented | Demonstrated discover/pay/retry with deterministic outputs and errors |
+| Dependency licensing | Reachable production dependency gate reports no strong copyleft | Gate remains green for the release lockfile and SBOM is published |
+| Operations | Local/container topology and metrics defined | Hosted SLO, runbook, alerts, backups, restore test and incident procedure verified |
+
+Published evidence must include immutable CI links, exact dependency/package versions, transaction hashes linked to a Stellar explorer, test date and network. A local mock, build-only result or manually constructed noncanonical client does not satisfy a network acceptance item.
+
+## Grant delivery plan to mainnet
+
+### Milestone 1 — Public testnet and Bazaar foundation
+
+- Harden the hosted/self-hosted exact facilitator and self-facilitation package around upstream `@x402/stellar`.
+- Complete native HTTP/MCP automatic cataloging, origin control, canonical filters, headers and seller/buyer SDK helpers.
+- Publish free testnet service, role-based seller/buyer/operator guides and the first paid/discoverable integration.
+- Run the canonical-client testnet suite and publish its settlement hash, CI transcript and wire fixtures.
+
+### Milestone 2 — Metered settlement, agents and production controls
+
+- Finalize the Stellar `upto` profile with the TSC and contribute implementation, contract, tests and fixtures upstream.
+- Expand MCP discover/pay/retry support and publish the second agent-driven integration with no pre-baked service integration.
+- Deliver the versioned relevance set, quality/latency report, load tests, on-chain monitoring plan and corresponding threat model.
+- Add channel signer management, KMS integration, reconciliation, backup/restore testing and operational dashboards.
+
+### Milestone 3 — Audit remediation and mainnet launch
+
+- Complete Audit Bank review and resolve all launch-blocking findings; audit funding is not included in the development budget.
+- Pass upstream and AutoLayer e2e/conformance suites for exact and `upto` on `stellar:testnet` and `stellar:pubnet`.
+- Publish one confirmed transaction hash per network per scheme, the conformance report, SBOM/license result and resolved security report.
+- Launch the permissively licensed managed service and reproducible self-hosted release, with at least 99% availability target, alerts, runbook and community maintenance handoff.
+
+Testnet remains free. Mainnet operator fees, if introduced, are configuration rather than protocol constants and can be set to zero by self-hosters. The service stays non-custodial: buyers authorize direct SEP-41 transfers and operators sponsor Stellar network fees without becoming the source or temporary holder of payment funds.
+
+## Maintenance commitment
+
+During the grant, upstream x402 spec and package changes are reviewed at least weekly and compatibility CI runs on every dependency update plus a scheduled cadence. After launch, AutoLayer will maintain supported release branches, publish migration notes for wire changes, triage conformance regressions as release blockers and provide a documented handoff path so the Stellar community can operate or fork the service under Apache-2.0.
+
 ## Implementation status
 
 | Capability | Status | Notes |
@@ -246,13 +423,13 @@ Alerts should cover elevated invalid-reason rates, settlement confirmation timeo
 | Public website and console | Implemented | Production build and SPA deployment configuration |
 | Classic XLM transaction | Implemented | Stellar Wallets Kit signing; testnet and pubnet |
 | Automation persistence and scheduler | Implemented | Generic contract call, DCA, rebalance, disbursement domain |
-| x402 exact facilitator | Implemented | Upstream `@x402/stellar`, both networks |
+| x402 exact facilitator | Implemented MVP | Upstream `@x402/stellar`, both networks registered; canonical testnet settlement published; hosted pubnet evidence remains |
 | Sponsored settlement | Implemented | Configurable fee ceiling |
-| Bazaar catalog/list/search | Implemented MVP | Ownership proof and search evaluation remain production-hardening work |
+| Bazaar catalog/list/search | Implemented MVP | Native cataloging and search baseline published; origin proof and expanded production evaluation remain |
 | MCP search and paid proxy | Implemented MVP | Caller provides payment signature |
 | Skills catalog and spec preview | Implemented MVP | Versioned static registry with filters, action schemas, safety and retry semantics |
 | xWrapper multi-tenant gateway | Implemented MVP | Persistent proxy, x402 settlement, Bazaar, quotas, audit and analytics; external review remains |
 | xVault2 | Implemented MVP | AES-256-GCM persistence and scoped injection; KMS custody/rotation remain launch gates |
-| Stellar `upto` | Not advertised | Requires upstream specification, implementation, contract decision, tests, and review |
+| Stellar `upto` | Prototype, not advertised | Draft profile, testnet contract deployment and settlement evidence exist; upstream acceptance, adapters, audit and pubnet remain |
 
 This table is the source of truth for product claims. A successful TypeScript build is not equivalent to a mainnet conformance run or security review.
