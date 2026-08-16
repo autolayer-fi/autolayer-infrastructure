@@ -1,0 +1,15 @@
+.git
+.agents
+.codex
+node_modules
+**/node_modules
+**/dist
+**/build
+**/coverage
+**/target
+*.log
+.env
+**/.env
+!**/.env.example
+submissions
+autolay-core-backup

@@ -28,6 +28,10 @@ const schema = z.object({
 	X402_MAX_TRANSACTION_FEE_STROOPS: z.coerce.number().int().positive().default(50000),
 	AUTOMATION_PAYMASTER_SECRET: z.string().min(56),
 	PAYMENT_RELAYER_SECRET: z.string().min(56),
+	PAYMENT_RELAYER_SECRETS: z.string().optional(),
+	X402_MAINNET_API_KEYS: z.string().default(""),
+	X402_FACILITATOR_REQUESTS_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(600),
+	X402_MAINNET_PLATFORM_FEE_BPS: z.coerce.number().int().min(0).max(10000).default(0),
 	TREASURY_G_ACCOUNT: z.string().regex(/^G[A-Z2-7]{55}$/),
 	PAYMENT_AUTH_TTL_LEDGERS: z.coerce
 		.number()
@@ -42,6 +46,9 @@ const schema = z.object({
 		.default(120000),
 	X402_NETWORK: z.enum(["TESTNET", "PUBLIC"]).default("TESTNET"),
 	X402_BASE_PRICE: z.string().regex(/^\d+$/).default("500000"),
+	X402_TESTNET_EVIDENCE_ASSET: z.string().regex(/^C[A-Z2-7]{55}$/).optional(),
+	X402_TESTNET_EVIDENCE_PAY_TO: z.string().regex(/^[GC][A-Z2-7]{55}$/).optional(),
+	X402_TESTNET_EVIDENCE_AMOUNT: z.string().regex(/^[1-9]\d*$/).default("10000"),
 	X402_QUOTE_TTL_SECONDS: z.coerce.number().int().positive().default(900),
 	PUBLIC_BASE_URL: z.string().url().default("http://localhost:5001"),
 	AGENDA_PROCESS_EVERY: z.string().default("5 seconds"),
@@ -80,4 +87,7 @@ export const env = {
 			: parsed.data.CORS_ORIGINS.split(",")
 					.map((value) => value.trim())
 					.filter(Boolean),
+	paymentRelayerSecrets: (parsed.data.PAYMENT_RELAYER_SECRETS || parsed.data.PAYMENT_RELAYER_SECRET)
+		.split(",").map(value => value.trim()).filter(Boolean),
+	x402MainnetApiKeys: new Set(parsed.data.X402_MAINNET_API_KEYS.split(",").map(value => value.trim()).filter(Boolean)),
 };

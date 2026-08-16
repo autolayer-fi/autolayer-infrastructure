@@ -1,6 +1,6 @@
 # Build from the monorepo root:
 # docker build -f apps/api/Dockerfile .
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
 COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
@@ -9,7 +9,7 @@ RUN pnpm install --no-frozen-lockfile
 COPY apps/api ./apps/api
 RUN pnpm build
 
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/apps/api/dist ./dist

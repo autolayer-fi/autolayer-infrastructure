@@ -1,0 +1,13 @@
+---
+title: Seller — publish a discoverable paid service
+---
+
+# Seller path
+
+Use xWrapper when an existing HTTPS API cannot be modified. Create a wrapper in the console, choose `stellar:testnet`, a SEP-41 contract, integer seven-decimal base-unit price, receiving account, limits, and an optional encrypted upstream credential. The wrapper is a secondary managed-registration path.
+
+For a native resource server, use `declareHttpDiscovery` from `@autolayer/sdk` and attach the returned `bazaar` extension to the canonical x402 route. Give every parameter a useful description and example. A stock x402 client echoes this extension in its payment payload. After successful settlement, the facilitator validates the supplied Draft 2020-12 schema, sanitizes metadata, validates any percent-decoded `routeTemplate`, and catalogs the resource automatically. Read `EXTENSION-RESPONSES`; `bazaar.status=success` confirms the listing landed, while `rejectedReason` explains a soft rejection.
+
+Issued Stellar assets require the recipient to have the corresponding trustline before it can receive value. Test that prerequisite before publishing. The facilitator supports SEP-41 token contract addresses; amounts are integer base units (USDC has seven decimals).
+
+Acceptance target: a new developer can publish, pay once, and find the endpoint through `/discovery/resources` in under one hour.
