@@ -83,7 +83,25 @@ async function migrate(): Promise<void> {
 	await pool.end();
 }
 
+// migrate().catch((error) => {
+// 	logger.error({ error }, "migration process failed");
+// 	process.exit(1);
+// });
+
 migrate().catch((error) => {
-	logger.error({ error }, "migration process failed");
+	logger.error(
+		{
+			error:
+				error instanceof Error
+					? {
+							name: error.name,
+							message: error.message,
+							stack: error.stack,
+						}
+					: error,
+		},
+		"migration process failed",
+	);
+
 	process.exit(1);
 });
