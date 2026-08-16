@@ -1,0 +1,12 @@
+[
+  { "query": "weather forecast by city", "relevant": { "https://benchmark.autolayer.dev/weather": 3, "https://benchmark.autolayer.dev/climate-mcp": 1 } },
+  { "query": "analyze a stock ticker", "relevant": { "https://benchmark.autolayer.dev/equity-mcp": 3, "https://benchmark.autolayer.dev/market-data": 1 } },
+  { "query": "current crypto market price", "relevant": { "https://benchmark.autolayer.dev/market-data": 3 } },
+  { "query": "translate text into spanish", "relevant": { "https://benchmark.autolayer.dev/translate": 3 } },
+  { "query": "summarize a legal document", "relevant": { "https://benchmark.autolayer.dev/document-mcp": 3 } },
+  { "query": "check stellar account risk", "relevant": { "https://benchmark.autolayer.dev/stellar-risk": 3, "https://benchmark.autolayer.dev/compliance-mcp": 2 } },
+  { "query": "generate an image", "relevant": { "https://benchmark.autolayer.dev/image": 3 } },
+  { "query": "send an email campaign", "relevant": { "https://benchmark.autolayer.dev/email-mcp": 3 } },
+  { "query": "historical exchange rates", "relevant": { "https://benchmark.autolayer.dev/fx-history": 3, "https://benchmark.autolayer.dev/market-data": 1 } },
+  { "query": "detect fraud in a payment", "relevant": { "https://benchmark.autolayer.dev/fraud": 3, "https://benchmark.autolayer.dev/stellar-risk": 1 } }
+]

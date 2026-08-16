@@ -21,6 +21,10 @@
     "migrate": "pnpm --filter @autolayer/api migrate",
     "start": "pnpm --filter @autolayer/api start",
     "pack:sdk": "pnpm --filter @autolayer/sdk pack",
-    "build:packages": "pnpm --filter @autolayer/sdk build"
+    "build:packages": "pnpm --filter @autolayer/sdk build",
+    "license:check": "node scripts/check-licenses.mjs",
+    "conformance:check": "node scripts/check-x402-conformance.mjs",
+    "search:seed": "pnpm --filter @autolayer/api search:seed",
+    "search:evaluate": "node scripts/evaluate-search.mjs"
   }
 }

@@ -1,50 +1,36 @@
 import { Networks } from "@stellar/stellar-sdk";
-import { StellarWalletsKit } from "@creit-tech/stellar-wallets-kit/sdk";
-import { defaultModules } from "@creit-tech/stellar-wallets-kit/modules/utils";
+import { getAddress, getNetwork, isAllowed, requestAccess, signAuthEntry as freighterSignAuthEntry, signTransaction } from "@stellar/freighter-api";
 import type { Network } from "./api";
 
-let initialized = false;
-
-function initializeWalletKit(): void {
-  if (initialized) return;
-  StellarWalletsKit.init({ modules: defaultModules(), network: Networks.TESTNET });
-  initialized = true;
-}
-
 function selectNetwork(network: Network): string {
-  initializeWalletKit();
-  const passphrase = network === "PUBLIC" ? Networks.PUBLIC : Networks.TESTNET;
-  StellarWalletsKit.setNetwork(passphrase);
-  return passphrase;
+  return network === "PUBLIC" ? Networks.PUBLIC : Networks.TESTNET;
 }
 
 export async function connectWallet(): Promise<string> {
-  initializeWalletKit();
-  const { address } = await StellarWalletsKit.authModal();
+  const { address, error } = await requestAccess();
+  if (error) throw new Error(error.message);
   if (!address) throw new Error("The selected wallet did not return an address.");
   return address;
 }
 
 export async function restoreWallet(): Promise<string | null> {
   try {
-    initializeWalletKit();
-    return (await StellarWalletsKit.getAddress()).address || null;
+    const permission = await isAllowed();
+    if (!permission.isAllowed) return null;
+    return (await getAddress()).address || null;
   } catch {
     return null;
   }
 }
 
 export async function openWalletProfile(): Promise<string | null> {
-  initializeWalletKit();
-  await StellarWalletsKit.profileModal();
-  return restoreWallet();
+  return connectWallet();
 }
 
 export async function assertWalletNetwork(network: Network): Promise<void> {
-  initializeWalletKit();
   const expected = network === "PUBLIC" ? Networks.PUBLIC : Networks.TESTNET;
   try {
-    const current = await StellarWalletsKit.getNetwork();
+    const current = await getNetwork();
     if (current.networkPassphrase && current.networkPassphrase !== expected) {
       throw new Error(`Your wallet is connected to ${current.network || "another network"}. Switch it to ${network === "PUBLIC" ? "Stellar Mainnet" : "Stellar Testnet"} and try again.`);
     }
@@ -57,7 +43,8 @@ export async function assertWalletNetwork(network: Network): Promise<void> {
 export async function signXdr(xdr: string, network: Network, address?: string): Promise<string> {
   await assertWalletNetwork(network);
   const networkPassphrase = selectNetwork(network);
-  const { signedTxXdr } = await StellarWalletsKit.signTransaction(xdr, { networkPassphrase, address });
+  const { signedTxXdr, error } = await signTransaction(xdr, { networkPassphrase, address });
+  if (error) throw new Error(error.message);
   if (!signedTxXdr) throw new Error("The selected wallet did not return a signed transaction.");
   return signedTxXdr;
 }
@@ -66,9 +53,12 @@ export async function signAuthEntry(authEntryXdr: string, network: Network, addr
   await assertWalletNetwork(network);
   const networkPassphrase = selectNetwork(network);
   try {
-    const { signedAuthEntry } = await StellarWalletsKit.signAuthEntry(authEntryXdr, { networkPassphrase, address });
+    const { signedAuthEntry, error } = await freighterSignAuthEntry(authEntryXdr, { networkPassphrase, address });
+    if (error) throw new Error(error.message);
     if (!signedAuthEntry) throw new Error("Empty authorization signature");
-    return signedAuthEntry;
+    return typeof signedAuthEntry === "string"
+      ? signedAuthEntry
+      : signedAuthEntry.toString("base64");
   } catch (error) {
     const message = error instanceof Error ? error.message : "Authorization signing failed";
     throw new Error(`This wallet could not sign the Soroban authorization entry. Select a SEP-43 compatible wallet. ${message}`);
@@ -76,6 +66,6 @@ export async function signAuthEntry(authEntryXdr: string, network: Network, addr
 }
 
 export async function disconnectWallet(): Promise<void> {
-  initializeWalletKit();
-  await StellarWalletsKit.disconnect();
+  // Freighter intentionally owns connection permission. AutoLayer clears its
+  // local session; users revoke site permission in the wallet when desired.
 }

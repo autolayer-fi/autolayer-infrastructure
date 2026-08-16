@@ -12,7 +12,9 @@
         "groups": [
           { "group": "Start", "pages": ["introduction", "quickstart", "sdk/typescript"] },
           { "group": "Build", "pages": ["products/runtime", "products/facilitator", "products/bazaar", "products/xwrapper", "products/skills"] },
-          { "group": "Architecture", "pages": ["architecture/production-architecture", "architecture/security"] },
+          { "group": "Role-based x402 guides", "pages": ["guides/seller", "guides/buyer-agent", "guides/operator"] },
+          { "group": "x402 release", "pages": ["x402/rfp-update"] },
+          { "group": "Architecture", "pages": ["architecture/production-architecture", "architecture/security", "architecture/audit-readiness"] },
           { "group": "Operate", "pages": ["operations/configuration", "operations/deployment", "operations/monitoring", "operations/self-hosting"] }
         ]
       },

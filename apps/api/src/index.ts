@@ -20,6 +20,7 @@ import {
   declareDiscoveryExtension,
 } from "@x402/extensions/bazaar";
 import { facilitator } from "./services/x402-facilitator.js";
+import { catalogPayment } from "./services/bazaar.js";
 import type { SupportedResponse } from "@x402/core/types";
 
 const app = express();
@@ -33,7 +34,13 @@ app.use(pinoHttp({ logger }));
 const facilitatorClient = {
   getSupported: async () => facilitator.getSupported() as SupportedResponse,
   verify: facilitator.verify.bind(facilitator),
-  settle: facilitator.settle.bind(facilitator),
+  settle: async (...args: Parameters<typeof facilitator.settle>) => {
+    const result = await facilitator.settle(...args);
+    // Self-facilitated resource servers use the same automatic Bazaar trust
+    // boundary as POST /settle; no manual wrapper registration is involved.
+    if (result.success) await catalogPayment(args[0], args[1]);
+    return result;
+  },
 };
 const paidResourceServer = new x402ResourceServer(facilitatorClient)
   .register("stellar:testnet", new ExactStellarServerScheme())
@@ -46,9 +53,14 @@ app.use(
         accepts: [
           {
             scheme: "exact",
-            price: "$0.01",
+            price: env.X402_TESTNET_EVIDENCE_ASSET
+              ? {
+                  asset: env.X402_TESTNET_EVIDENCE_ASSET,
+                  amount: env.X402_TESTNET_EVIDENCE_AMOUNT,
+                }
+              : "$0.01",
             network: "stellar:testnet",
-            payTo: env.TREASURY_G_ACCOUNT,
+            payTo: env.X402_TESTNET_EVIDENCE_PAY_TO ?? env.TREASURY_G_ACCOUNT,
           },
           {
             scheme: "exact",
@@ -147,6 +159,7 @@ app.use(
 
 async function start(): Promise<void> {
   await pool.query("SELECT 1");
+  await paidResourceServer.initialize();
 
   // Register handlers before starting Agenda.
   defineAutomationJob();
