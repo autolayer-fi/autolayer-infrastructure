@@ -8,6 +8,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://autolayer:autolayer@localhost:5432/autolayer
+      KEY_ENCRYPTION_MASTER_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      STELLAR_RPC_KEY: ""
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -18,6 +23,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Generate ephemeral Stellar test identities
+        run: |
+          pnpm --filter @autolayer/api exec tsx -e "import { Keypair } from '@stellar/stellar-sdk'; const automation = Keypair.random(); const relayer = Keypair.random(); const treasury = Keypair.random(); console.log('AUTOMATION_PAYMASTER_SECRET=' + automation.secret()); console.log('PAYMENT_RELAYER_SECRET=' + relayer.secret()); console.log('TREASURY_G_ACCOUNT=' + treasury.publicKey());" >> "$GITHUB_ENV"
       - run: pnpm -r --if-present run test
       - run: pnpm -r run build
       - run: pnpm license:check
