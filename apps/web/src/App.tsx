@@ -123,7 +123,9 @@ export function App() {
       >
         <Route
           path="/console"
-          element={<ConsoleOverview address={address} />}
+          element={
+            <ConsoleOverview address={address} sessionToken={sessionToken} />
+          }
         />
         <Route
           path="/console/automations"

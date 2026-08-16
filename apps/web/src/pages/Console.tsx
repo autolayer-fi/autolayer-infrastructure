@@ -3,12 +3,14 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
+  Boxes,
   CalendarClock,
   Check,
   CircleDollarSign,
   Clock3,
   Copy,
   ExternalLink,
+  Globe2,
   KeyRound,
   LoaderCircle,
   MoreHorizontal,
@@ -32,7 +34,13 @@ import {
   SurfaceHeader,
 } from "../components/ConsoleUI";
 import { useToast } from "../components/Toast";
-import { api, type Automation, type Network, type Proposal } from "../lib/api";
+import {
+  api,
+  type Automation,
+  type GatewayWrapper,
+  type Network,
+  type Proposal,
+} from "../lib/api";
 import {
   fundTestnetAccount,
   getAccountStatus,
@@ -43,11 +51,19 @@ import {
 } from "../lib/stellar";
 import { signAuthEntry } from "../lib/wallet";
 
-export function ConsoleOverview({ address }: { address: string }) {
+export function ConsoleOverview({
+  address,
+  sessionToken,
+}: {
+  address: string;
+  sessionToken: string;
+}) {
   const [health, setHealth] = useState<"checking" | "online" | "offline">(
     "checking",
   );
-  const [automations, setAutomations] = useState<Automation[]>([]);
+  const [wrappers, setWrappers] = useState<GatewayWrapper[]>([]);
+  const [resourceCount, setResourceCount] = useState(0);
+  const [networkCount, setNetworkCount] = useState(0);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   useEffect(() => {
     api
@@ -56,114 +72,139 @@ export function ConsoleOverview({ address }: { address: string }) {
       .catch(() => setHealth("offline"));
   }, []);
   useEffect(() => {
-    if (address) {
-      setLoadingMetrics(true);
-      api
-        .automations(address)
-        .then((result) => setAutomations(result.automations))
-        .catch(() => setAutomations([]))
-        .finally(() => setLoadingMetrics(false));
-    } else {
-      setAutomations([]);
-      setLoadingMetrics(false);
-    }
-  }, [address]);
-  const active = automations.filter((item) => item.status === "ACTIVE").length;
-  const completedRuns = automations.reduce(
-    (sum, item) => sum + item.runCount,
-    0,
-  );
-  const scheduled = automations.filter((item) => item.nextRunAt).length;
+    setLoadingMetrics(true);
+    Promise.all([
+      api.resources(new URLSearchParams({ limit: "1", offset: "0" })),
+      api.supported(),
+      sessionToken
+        ? api.wrappers(sessionToken)
+        : Promise.resolve({ items: [] as GatewayWrapper[] }),
+    ])
+      .then(([resources, supported, wrapperResult]) => {
+        setResourceCount(resources.pagination.total);
+        setNetworkCount(
+          new Set(supported.kinds.map((item) => item.network)).size,
+        );
+        setWrappers(wrapperResult.items);
+      })
+      .catch(() => {
+        setResourceCount(0);
+        setNetworkCount(0);
+        setWrappers([]);
+      })
+      .finally(() => setLoadingMetrics(false));
+  }, [sessionToken]);
+  const liveWrappers = wrappers.filter((item) => item.enabled).length;
   return (
     <div>
       <PageHeader
         eyebrow="Workspace"
         title="Dashboard"
-        description="Monitor execution, manage infrastructure, and ship new Stellar resources."
+        description="Publish paid APIs, inspect Stellar x402 capabilities, and discover services built for agents."
       />
-      {!address ? (
+      {!address && (
         <section className="dashboard-welcome mt-7">
           <span>
             <Wallet />
           </span>
           <p>GET STARTED</p>
-          <h2>Connect your Stellar wallet</h2>
+          <h2>Explore publicly, connect to publish</h2>
           <div>
-            Your wallet opens your private workspace and authorizes every
-            transaction. AutoLayer never receives or stores your secret key.
+            Bazaar and facilitator capabilities are public. Connect your wallet
+            only when you are ready to manage credentials or deploy an xWrapper.
           </div>
           <small>
             Use <b>Connect wallet</b> in the top-right corner to continue.
           </small>
         </section>
-      ) : (
-        <>
-          <section className="dashboard-summary mt-7">
+      )}
+      <section className="dashboard-summary mt-7">
             <DashboardStat
-              label="Total automations"
-              value={loadingMetrics ? "—" : automations.length}
-              note="Created in this wallet"
+              label="Your xWrappers"
+              value={loadingMetrics ? "—" : wrappers.length}
+              note={address ? "Owned by this wallet" : "Connect to manage"}
             />
             <DashboardStat
-              label="Active"
-              value={loadingMetrics ? "—" : active}
-              note="Running schedules"
+              label="Live wrappers"
+              value={loadingMetrics ? "—" : liveWrappers}
+              note="Published paid APIs"
               tone="success"
             />
             <DashboardStat
-              label="Completed runs"
-              value={loadingMetrics ? "—" : completedRuns}
-              note="Successful executions"
+              label="Bazaar resources"
+              value={loadingMetrics ? "—" : resourceCount}
+              note="HTTP and MCP listings"
             />
             <DashboardStat
-              label="Scheduled"
-              value={loadingMetrics ? "—" : scheduled}
-              note="Upcoming runs"
+              label="x402 networks"
+              value={loadingMetrics ? "—" : networkCount}
+              note="Advertised capabilities"
             />
-          </section>
+      </section>
           <div className="dashboard-section-heading mt-8">
             <div>
-              <h2>Start building</h2>
+              <h2>Seller-to-agent workflow</h2>
               <p>
-                Create infrastructure for applications and agents on Stellar.
+                Bring an API, publish its payment terms, and make it discoverable.
               </p>
             </div>
           </div>
+          <div className="mt-4 grid gap-2 text-center text-xs text-slate-400 sm:grid-cols-4">
+            {[
+              "1. Store API credential",
+              "2. Deploy xWrapper",
+              "3. Verify HTTP 402",
+              "4. Discover in Bazaar",
+            ].map((step) => (
+              <div
+                className="rounded-lg border border-white/10 bg-white/[.025] px-3 py-3"
+                key={step}
+              >
+                {step}
+              </div>
+            ))}
+          </div>
           <section className="dashboard-cta-grid mt-4">
             <DashboardCta
-              to="/console/automations/new"
-              icon={<Activity />}
-              title="Create an automation"
-              detail="Schedule a Soroban contract call or recurring asset payment."
-              action="Create"
-            />
-            <DashboardCta
               to="/console/xwrapper/new"
-              icon={<Server />}
+              icon={<Globe2 />}
               title="Deploy a paid API"
-              detail="Publish an HTTPS endpoint as a Stellar x402 resource."
+              detail="Wrap an HTTPS endpoint, attach xVault2 credentials, and publish it."
               action="Deploy"
             />
             <DashboardCta
-              to="/console/api-keys"
-              icon={<KeyRound />}
-              title="Generate an API key"
-              detail="Authenticate an SDK, agent, server, or CI environment."
-              action="Manage"
+              to="/console/bazaar"
+              icon={<Boxes />}
+              title="Explore Bazaar"
+              detail="Search machine-payable HTTP endpoints and MCP tools."
+              action="Search"
+            />
+            <DashboardCta
+              to="/console/facilitator"
+              icon={<Server />}
+              title="Inspect facilitator"
+              detail="View live x402 schemes, networks, extensions, and fee sponsorship."
+              action="Inspect"
             />
           </section>
           <section className="dashboard-status mt-8">
             <div>
               <span className={`dashboard-status-dot is-${health}`} />
               <div>
-                <strong>AutoLayer API</strong>
-                <small>Backend connectivity</small>
+                <strong>Hosted AutoLayer API</strong>
+                <small>Live backend connectivity—not a mainnet readiness claim</small>
               </div>
             </div>
             <StatePill status={health} />
           </section>
-        </>
-      )}
+      <div className="mt-6 text-right">
+        <Link
+          className="text-xs text-slate-500 transition hover:text-emerald-300"
+          to="/console/automations"
+        >
+          Looking for scheduled execution? Open Automations →
+        </Link>
+      </div>
     </div>
   );
 }
