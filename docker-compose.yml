@@ -28,7 +28,15 @@ services:
     depends_on:
       postgres-core:
         condition: service_healthy
-    command: sh -c "pnpm migrate && pnpm start"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - autolayer
 
 volumes:
   core_autolayer_pg:

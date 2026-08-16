@@ -1,0 +1,13 @@
+---
+title: Operator — host or self-facilitate
+---
+
+# Operator path
+
+Deploy the Apache-2.0 Docker stack with PostgreSQL, independent testnet/pubnet RPC endpoints, and funded relayer accounts. `PAYMENT_RELAYER_SECRETS` accepts a comma-separated signer pool to avoid a single source-account sequence bottleneck. Keep automation and payment identities separate.
+
+Testnet remains unauthenticated and free within the configurable rate limit. Mainnet caller keys are optional through `X402_MAINNET_API_KEYS`; an empty value disables caller authentication. `X402_MAINNET_PLATFORM_FEE_BPS` documents operator pricing and defaults to zero—no fee is hard-wired into settlement. Operators remain responsible for implementing fee collection transparently outside the non-custodial transfer contract.
+
+Probe `/health/live`, `/health/ready`, and `/supported`. Alert on rejection rate by reason, RPC/simulation/settlement latency, indeterminate transactions, signer balances and sequence contention, catalog rejection rate, database saturation, search p95, and zero-result rate. If RPC settlement is degraded, continue read-only discovery but reject new settlement with a non-null reason; never guess whether an indeterminate payment settled.
+
+Run `pnpm license:check`, the full test/build suite, and `pnpm conformance:check -- https://your-host` for every release. Mainnet production requires an independent Audit Bank review and resolved findings.

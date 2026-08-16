@@ -11,6 +11,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "pnpm migrate && node dist/index.js",
     "migrate": "tsx src/db/migrate.ts",
+    "search:seed": "tsx scripts/seed-search-quality.ts",
+    "evidence:testnet": "tsx scripts/canonical-testnet-settlement.ts",
     "test": "vitest run --passWithNoTests",
     "lint": "tsc -p tsconfig.json --noEmit"
   },

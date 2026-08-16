@@ -1,0 +1,11 @@
+---
+title: Buyer and agent — discover and pay
+---
+
+# Buyer and agent path
+
+Instantiate `StellarBazaarClient`, call `search()` with a natural-language intent and optional network/type/payee filters, then call `paidCall()`. The first request obtains the canonical `PAYMENT-REQUIRED` challenge. Your wallet adapter receives the decoded challenge and must sign the Soroban authorization entry—not a pre-signed settlement transaction. The SDK retries with its returned `PAYMENT-SIGNATURE`.
+
+Agents can use the MCP `search_services` and `paid_call` tools. Calling `paid_call` without a signature returns `paymentRequired` and `nextAction: SIGN_PAYMENT_AND_RETRY`; call it again with the wallet-created payload. Every MCP error includes `error.data.reason`.
+
+Apply wallet policy before signing: network, settlement contract, asset, recipient, maximum per call, expiry, and aggregate budget. For `upto`, the on-chain cap is only the per-request ceiling; a smart account can enforce the broader session budget.

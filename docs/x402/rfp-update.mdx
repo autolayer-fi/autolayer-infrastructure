@@ -1,0 +1,110 @@
+---
+title: x402 RFP update — capabilities and testing
+description: Frontend, HTTP, MCP, SDK, facilitator, Bazaar, xWrapper, upto, security, and conformance capabilities delivered in the AutoLayer x402 update.
+---
+
+# x402 RFP update
+
+AutoLayer now runs locally as a Stellar x402 exact facilitator, PostgreSQL-backed Bazaar, xWrapper seller gateway, and agent-facing MCP service. It builds on `@x402/stellar`, supports `stellar:testnet` and `stellar:pubnet`, advertises sponsored fees, and is licensed under Apache-2.0.
+
+## Frontend
+
+Start the stack and open `http://localhost:5173`:
+
+```bash
+docker compose up -d --build
+```
+
+The application lets you:
+
+- Connect and authenticate with Freighter.
+- Inspect facilitator networks and infrastructure.
+- Create, update, disable, enable, and delete xWrappers.
+- Put x402 in front of an existing HTTPS API without modifying it.
+- Configure testnet/pubnet, SEP-41 token, atomic price, receiving account, description, and search tags.
+- Store an encrypted bearer token or custom-header credential for upstream injection.
+- Apply request rate, monthly quota, request-size, and response-size limits.
+- Copy and test the generated `/gateway/{slug}` endpoint.
+- Find the wrapper through Bazaar using its public name, description, and tags.
+- Inspect request outcomes, payment hashes, latency, and wrapper analytics.
+- Explore API keys, Playground, Agent Skills, and infrastructure pages.
+
+The upstream URL and credentials are not search-indexed. Use meaningful public listing metadata so agents can find the service.
+
+## Facilitator and Bazaar
+
+The facilitator exposes `/supported`, `/verify`, and `/settle` for x402 v2 exact payments on both Stellar networks. It composes the canonical Stellar scheme, preserves `payload.transaction`, sponsors fees, supports a configurable relayer pool, and returns non-null rejection reasons.
+
+Bazaar exposes:
+
+```text
+GET /discovery/resources
+GET /discovery/search
+```
+
+Browsing supports type, payee, scheme, network, extension, limit, and offset filters. Search provides weighted full-text ranking, cursor pagination, `partialResults`, settlement-frequency tie-breaking, and deterministic ordering. HTTP and MCP resources are first class.
+
+Automatic cataloging validates the discovery schema, rejects external references, binds echoed payment terms to settled requirements, validates percent-decoded route templates, applies metadata soft drops, and reports the outcome through `EXTENSION-RESPONSES`. xWrapper insertion is a secondary managed onboarding path.
+
+## MCP
+
+List tools:
+
+```bash
+curl -X POST http://localhost:5001/mcp \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+`search_services` performs natural-language Bazaar search and returns both text and machine-readable structured content.
+
+```bash
+curl -X POST http://localhost:5001/mcp \
+  -H 'content-type: application/json' \
+  -d '{
+    "jsonrpc":"2.0","id":2,"method":"tools/call",
+    "params":{"name":"search_services","arguments":{"query":"weather","network":"stellar:testnet","limit":10}}
+  }'
+```
+
+`paid_call` inspects an HTTPS cataloged resource, returns its 402 challenge and `SIGN_PAYMENT_AND_RETRY`, then accepts the wallet-created payment signature on retry. It enforces catalog membership, HTTPS, SSRF protection, no redirects, timeout, and response limits. Every error includes `error.data.reason`.
+
+## Direct testing
+
+```bash
+curl http://localhost:5001/health/live
+curl http://localhost:5001/health/ready
+curl http://localhost:5001/supported
+curl 'http://localhost:5001/discovery/resources?network=stellar:testnet'
+curl 'http://localhost:5001/discovery/search?query=test&network=stellar:testnet'
+curl -i http://localhost:5001/gateway/YOUR_SLUG
+```
+
+Decode a payment challenge:
+
+```bash
+curl -s -D - http://localhost:5001/gateway/YOUR_SLUG -o /dev/null | \
+  awk 'BEGIN{IGNORECASE=1} /^PAYMENT-REQUIRED:/{print $2}' | \
+  tr -d '\r' | base64 -d | jq
+```
+
+## SDK and `upto`
+
+The TypeScript SDK includes Bazaar browse/search, a challenge → wallet callback → signed retry flow, and a seller helper for parameter-rich discovery metadata.
+
+The repository also includes a draft Stellar `upto` network specification, non-custodial Soroban contract, replay protection, recipient/facilitator binding, cap validation, ledger expiration, TTL handling, smart-account budget composition, and contract tests. `upto` is not advertised by `/supported` until audited network deployments and the final upstream adapters exist.
+
+## Verification and limits
+
+```bash
+pnpm test
+pnpm build
+pnpm license:check
+pnpm conformance:check -- http://localhost:5001
+```
+
+The production dependency graph contains no detected strong-copyleft or uncertain licenses. Local builds, Docker images, migrations, health probes, API/SDK tests, and Soroban contract tests pass.
+
+Still external: live network transaction evidence, upstream `upto` merge, audited contract deployments, upstream x402 e2e runs, public search-quality results, Audit Bank report, and Stellar Developer Docs acceptance. These are tracked without being represented as complete.
+
+For the full capability and testing note, see `X402_RFP_UPDATE_NOTES.md` in the repository. For acceptance status, see `RFP_READINESS.md` and the conformance report template.

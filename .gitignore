@@ -10,6 +10,7 @@ node_modules/
 # Builds
 dist/
 build/
+contracts/*/target/
 coverage/
 .out/
 tmp/
@@ -133,3 +134,9 @@ uploads/
 
 # Local CLI configs
 .history/
+
+# Private grant research and submission drafts
+SCF_BUILD_INTEREST_APPLICATION.md
+*submission-comparison*.md
+*project-comparison*.md
+*competitor-research*.md

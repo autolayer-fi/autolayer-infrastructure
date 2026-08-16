@@ -1,5 +1,7 @@
 # AutoLayer
 
+> See [X402_RFP_UPDATE_NOTES.md](./X402_RFP_UPDATE_NOTES.md) for the complete Stellar facilitator, Bazaar, xWrapper, MCP, SDK, `upto`, testing, and external-acceptance capability note.
+
 AutoLayer is open-source execution, payment, discovery, and automation infrastructure for Stellar applications and agents. It combines a wallet-authorized automation runtime, an x402 v2 facilitator, Bazaar discovery, the xWrapper paid API gateway, encrypted xVault2 credential injection, fee sponsorship, an MCP server, and agent-readable financial skills.
 
 > AutoLayer is an independent product and has no architectural or product dependency on Atonima.
