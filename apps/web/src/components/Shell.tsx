@@ -37,7 +37,7 @@ export function MarketingShell() {
     ["Products", "/#products"],
     ["Developers", docsUrl],
     ["Playground", "/playground"],
-    ["Pricing", "/#pricing"],
+    ["Evidence", "/#evidence"],
   ];
   return (
     <div className="min-h-screen bg-ink text-white">
@@ -106,22 +106,27 @@ const productNav = [
     group: "Workspace",
   },
   {
-    to: "/console/automations",
-    label: "Automations",
-    icon: Activity,
+    to: "/console/xwrapper",
+    label: "xWrapper",
+    icon: Globe2,
     group: "Build",
-  },
-  { to: "/console/xwrapper", label: "xWrapper", icon: Globe2, group: "Build" },
-  {
-    to: "/console/facilitator",
-    label: "Facilitator",
-    icon: Server,
-    group: "Infrastructure",
   },
   {
     to: "/console/bazaar",
     label: "Bazaar",
     icon: Search,
+    group: "Build",
+  },
+  {
+    to: "/console/automations",
+    label: "Automations",
+    icon: Activity,
+    group: "Build",
+  },
+  {
+    to: "/console/facilitator",
+    label: "Facilitator",
+    icon: Server,
     group: "Infrastructure",
   },
   {
@@ -205,8 +210,8 @@ export function ConsoleShell({
           <div className="ankr-network">
             <i />
             <div>
-              <b>All systems operational</b>
-              <small>Testnet & Mainnet</small>
+              <b>Stellar x402</b>
+              <small>Testnet + pubnet capability</small>
             </div>
           </div>
         </div>

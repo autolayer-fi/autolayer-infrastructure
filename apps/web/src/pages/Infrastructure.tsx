@@ -140,7 +140,7 @@ export function Facilitator() {
                           )}
                         </td>
                         <td>
-                          <StatePill status="Online" />
+                          <StatePill status="Supported" />
                         </td>
                       </tr>
                     ))}
