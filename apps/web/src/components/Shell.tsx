@@ -8,7 +8,6 @@ import {
   Layers3,
   KeyRound,
   Menu,
-  Orbit,
   Search,
   Server,
   Sparkles,
@@ -23,8 +22,13 @@ const docsUrl = "https://docs.autolayer.fi";
 export function Mark({ compact = false }: { compact?: boolean }) {
   return (
     <Link to="/" className="console-mark">
-      <span>
-        <Orbit />
+      <span className="console-mark-icon">
+        <img
+          className="console-mark-logo"
+          src="/favicon.svg"
+          alt=""
+          aria-hidden="true"
+        />
       </span>
       {!compact && <b>AutoLayer</b>}
     </Link>

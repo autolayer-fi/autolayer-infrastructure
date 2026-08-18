@@ -338,6 +338,12 @@ textarea {
   font-size: 15px;
   letter-spacing: -0.02em;
 }
+.console-mark-logo {
+  display: block;
+  height: 31px;
+  width: 31px;
+  border-radius: 7px;
+}
 .console-sidebar nav {
   margin-top: 28px;
 }
@@ -3915,6 +3921,19 @@ textarea {
 }
 
 /* Final brand overrides intentionally follow the structural theme. */
+.console-mark > .console-mark-icon,
+.console-app .console-mark > .console-mark-icon {
+  height: 31px;
+  width: 31px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: none;
+}
+.console-mark .console-mark-logo {
+  height: 31px;
+  width: 31px;
+}
 .automation-stepper {
   position: relative;
   display: grid;
