@@ -179,7 +179,7 @@ export function XWrapper({
       )
     : 0;
   const snippet = selected
-    ? `import { wrapFetchWithPayment } from "@x402/fetch";\n\nconst paidFetch = wrapFetchWithPayment(fetch, walletClient);\nconst response = await paidFetch("${selected.endpoint}");\nconst data = await response.json();`
+    ? `import { wrapFetchWithPayment } from "@x402/fetch";\n\nconst paidFetch = wrapFetchWithPayment(fetch, walletClient);\nconst response = await paidFetch("${selected.endpoint}", { method: "${selected.method}"${selected.method === "GET" ? "" : ', body: JSON.stringify({})'} });\nconst data = await response.json();`
     : "";
   return (
     <div className="console-route-page pb-10">
@@ -509,6 +509,7 @@ export function XWrapperCreate({
         name: String(data.get("name")),
         description: String(data.get("description")),
         upstreamUrl: String(data.get("upstreamUrl")),
+        method: String(data.get("method")),
         network,
         asset: String(data.get("asset")),
         amount: String(data.get("amount")),
@@ -770,7 +771,16 @@ export function DeployForm({
               placeholder="https://api.example.com/v1/data"
             />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="HTTP method">
+              <select name="method" className="input" defaultValue="GET">
+                <option>GET</option>
+                <option>POST</option>
+                <option>PUT</option>
+                <option>PATCH</option>
+                <option>DELETE</option>
+              </select>
+            </Field>
             <Field label="Response type">
               <select name="mimeType" className="input">
                 <option>application/json</option>
@@ -1115,13 +1125,14 @@ function Detail({
             <span className="truncate">{wrapper.endpoint}</span>
             <ExternalLink size={14} />
           </a>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {[
               [
                 "Network",
                 wrapper.network.endsWith("pubnet") ? "Mainnet" : "Testnet",
               ],
               ["Price", `${wrapper.amount} atomic`],
+              ["Method", wrapper.method],
               ["Rate limit", `${wrapper.requestsPerMinute}/min`],
               ["Monthly quota", wrapper.monthlyRequestQuota.toLocaleString()],
             ].map(([label, value]) => (

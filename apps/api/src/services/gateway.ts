@@ -35,6 +35,7 @@ export const wrapperInput = z
     name: z.string().min(2).max(120),
     description: z.string().max(1000).default(""),
     upstreamUrl: z.string().url().max(2048),
+    method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).default("GET"),
     network: z.enum(["stellar:testnet", "stellar:pubnet"]),
     asset: contractAddress,
     amount: z.string().regex(/^[1-9][0-9]*$/),
@@ -68,6 +69,7 @@ export const wrapperPatch = z.object({
   name: z.string().min(2).max(120).optional(),
   description: z.string().max(1000).optional(),
   upstreamUrl: z.string().url().max(2048).optional(),
+  method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).optional(),
   network: z.enum(["stellar:testnet", "stellar:pubnet"]).optional(),
   asset: contractAddress.optional(),
   amount: z
@@ -97,6 +99,7 @@ function publicWrapper(row: Record<string, unknown>) {
     name: row.name,
     description: row.description,
     upstreamUrl: row.upstream_url,
+    method: row.method,
     network: row.network,
     scheme: row.scheme,
     asset: row.asset,
@@ -177,6 +180,7 @@ export async function createWrapper(
       input.name,
       input.description,
       input.upstreamUrl,
+      input.method,
       input.network,
       input.asset,
       input.amount,
@@ -194,7 +198,7 @@ export async function createWrapper(
     ];
     try {
       result = await pool.query(
-        `INSERT INTO gateway_wrappers(id,owner_id,slug,name,description,upstream_url,network,asset,amount,pay_to,mime_type,tags,secret_id,auth_type,auth_header,enabled,requests_per_minute,monthly_request_quota,max_request_bytes,max_response_bytes) VALUES(${values.map((_, i) => `$${i + 1}`).join(",")}) RETURNING *`,
+        `INSERT INTO gateway_wrappers(id,owner_id,slug,name,description,upstream_url,method,network,asset,amount,pay_to,mime_type,tags,secret_id,auth_type,auth_header,enabled,requests_per_minute,monthly_request_quota,max_request_bytes,max_response_bytes) VALUES(${values.map((_, i) => `$${i + 1}`).join(",")}) RETURNING *`,
         values,
       );
       break;
@@ -260,6 +264,7 @@ export async function updateWrapper(
     name: current.name,
     description: current.description,
     upstreamUrl: current.upstream_url,
+    method: current.method,
     network: current.network,
     asset: current.asset,
     amount: current.amount,
@@ -279,13 +284,14 @@ export async function updateWrapper(
   await assertSafeUpstream(merged.upstreamUrl);
   await validateSecret(ownerId, merged.secretId);
   const result = await pool.query(
-    `UPDATE gateway_wrappers SET name=$3,description=$4,upstream_url=$5,network=$6,asset=$7,amount=$8,pay_to=$9,mime_type=$10,tags=$11,secret_id=$12,auth_type=$13,auth_header=$14,enabled=$15,requests_per_minute=$16,monthly_request_quota=$17,max_request_bytes=$18,max_response_bytes=$19,updated_at=NOW() WHERE id=$1 AND owner_id=$2 RETURNING *`,
+    `UPDATE gateway_wrappers SET name=$3,description=$4,upstream_url=$5,method=$6,network=$7,asset=$8,amount=$9,pay_to=$10,mime_type=$11,tags=$12,secret_id=$13,auth_type=$14,auth_header=$15,enabled=$16,requests_per_minute=$17,monthly_request_quota=$18,max_request_bytes=$19,max_response_bytes=$20,updated_at=NOW() WHERE id=$1 AND owner_id=$2 RETURNING *`,
     [
       id,
       ownerId,
       merged.name,
       merged.description,
       merged.upstreamUrl,
+      merged.method,
       merged.network,
       merged.asset,
       merged.amount,
@@ -425,7 +431,10 @@ function paymentRequired(
     },
     accepts: [req],
     extensions: declareDiscoveryExtension({
-      input: { type: "http" },
+      input: {
+        type: "http",
+        method: String(row.method) as "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+      },
       inputSchema: { properties: {}, required: [] },
       output: { example: { status: "paid" } },
     }),
@@ -531,6 +540,14 @@ export async function proxyGateway(request: Request, response: Response) {
       code: "WRAPPER_DISABLED",
       requestId,
     });
+  if (request.method !== row.method) {
+    response.setHeader("allow", String(row.method));
+    return response.status(405).json({
+      error: `Wrapper requires ${String(row.method)}`,
+      code: "METHOD_NOT_ALLOWED",
+      requestId,
+    });
+  }
   const path = request.params.splat
     ? Array.isArray(request.params.splat)
       ? request.params.splat.join("/")
