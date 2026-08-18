@@ -1,1 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#6ee7b7"/><circle cx="32" cy="32" r="15" fill="none" stroke="#06100d" stroke-width="5"/><path d="M10 32h44M32 10c7 7 10 14 10 22S39 47 32 54c-7-7-10-14-10-22s3-15 10-22Z" fill="none" stroke="#06100d" stroke-width="4"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">AutoLayer</title>
+  <rect width="512" height="512" rx="104" fill="#07121f"/>
+  <path d="M92 350 256 100l164 250" fill="none" stroke="#6ee7b7" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M92 408h42l122-164 122 164h42" fill="none" stroke="#38bdf8" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="256" cy="342" r="22" fill="#ff6b6b"/>
+</svg>
