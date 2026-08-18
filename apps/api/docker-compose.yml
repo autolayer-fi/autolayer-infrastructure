@@ -25,7 +25,7 @@ services:
     environment:
       DATABASE_URL: postgresql://autolayer:autolayer@postgres-core:5432/core-autolayer
     ports:
-      - "5001:5001"
+      - "127.0.0.1:5002:5001"
     depends_on:
       postgres-core:
         condition: service_healthy
