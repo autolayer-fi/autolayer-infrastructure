@@ -19,6 +19,7 @@ Management routes accept a wallet session, personal API key, or administrative o
 | `POST` | `/v1/vault/secrets` | Encrypt and store a new scoped credential |
 | `GET` | `/openapi.json` | Discover every enabled public USDC xWrapper through OpenAPI 3.1 |
 | `GET` | `/.well-known/x402` | Compatibility fan-out document for x402 discovery crawlers |
+| `GET` | `/favicon.ico` | AutoLayer origin icon used by external discovery catalogs |
 
 Public traffic uses `ANY /gateway/:slug/*`. The buyer receives canonical `PAYMENT-REQUIRED` terms, retries with `PAYMENT-SIGNATURE`, and receives `PAYMENT-RESPONSE` after settlement.
 
@@ -39,5 +40,7 @@ npx -y @agentcash/discovery@latest check \
 ```
 
 Registration is an external publication step. Review every discovered method, route, price, and authentication mode, then explicitly approve registration only after all critical parser and runtime probes pass.
+
+The hosted document publishes `support@autolayer.fi` as its origin-level contact and serves the AutoLayer mark at `/favicon.ico`. Self-hosters must replace `DISCOVERY_CONTACT_EMAIL` and `DISCOVERY_CONTACT_URL` with contact details for their own public origin. Seller account emails are never published automatically.
 
 <Note>Vault plaintext is never returned after creation and is injected only into the configured upstream request after successful payment settlement.</Note>
