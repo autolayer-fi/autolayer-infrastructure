@@ -20,11 +20,17 @@ import {
 import {
   buildOpenApiDocument,
   buildWellKnownDocument,
+  autoLayerFavicon,
   listDiscoverableWrappers,
 } from "../services/openapi-discovery.js";
 
 export const gatewayRoutes: ExpressRouter = Router();
 const idSchema = z.string().uuid();
+
+gatewayRoutes.get(["/favicon.ico", "/favicon.svg"], (_request, response) => {
+  response.setHeader("cache-control", "public, max-age=86400");
+  return response.type("image/svg+xml").send(autoLayerFavicon);
+});
 
 gatewayRoutes.get("/openapi.json", async (_request, response, next) => {
   try {

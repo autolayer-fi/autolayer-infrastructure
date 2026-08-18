@@ -38,6 +38,11 @@ describe("x402scan origin discovery", () => {
     const operation = document.paths["/gateway/stellar-weather"]!.get;
     expect(document.openapi).toBe("3.1.0");
     expect(document.info["x-guidance"]).toBeTruthy();
+    expect(document.info.contact).toEqual({
+      name: "AutoLayer Support",
+      email: "support@autolayer.fi",
+      url: "https://www.autolayer.fi",
+    });
     expect(document.servers).toEqual([{ url: "https://core.autolayer.fi" }]);
     expect(operation["x-payment-info"]).toEqual({
       price: { mode: "fixed", currency: "USD", amount: "0.0010000" },
