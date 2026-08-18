@@ -106,11 +106,18 @@ export function buildOpenApiDocument(
       version: "1.0.0",
       description: "Agent-payable APIs created with AutoLayer xWrapper and settled on Stellar.",
       "x-guidance": "Choose an operation, request it without credentials, read the canonical HTTP 402 payment requirements, authorize the Stellar payment, and retry with PAYMENT-SIGNATURE. Prices in x-payment-info are decimal USD; runtime accepts[].amount uses seven-decimal Stellar USDC atomic units.",
+      contact: {
+        name: "AutoLayer Support",
+        email: env.DISCOVERY_CONTACT_EMAIL,
+        url: env.DISCOVERY_CONTACT_URL,
+      },
     },
     servers: [{ url: baseUrl.replace(/\/$/, "") }],
     paths,
   };
 }
+
+export const autoLayerFavicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#6ee7b7"/><circle cx="32" cy="32" r="15" fill="none" stroke="#06100d" stroke-width="5"/><path d="M10 32h44M32 10c7 7 10 14 10 22S39 47 32 54c-7-7-10-14-10-22s3-15 10-22Z" fill="none" stroke="#06100d" stroke-width="4"/></svg>`;
 
 export function buildWellKnownDocument(
   wrappers: DiscoverableWrapper[],

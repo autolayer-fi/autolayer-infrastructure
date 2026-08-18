@@ -51,6 +51,8 @@ const schema = z.object({
 	X402_TESTNET_EVIDENCE_AMOUNT: z.string().regex(/^[1-9]\d*$/).default("10000"),
 	X402_QUOTE_TTL_SECONDS: z.coerce.number().int().positive().default(900),
 	PUBLIC_BASE_URL: z.string().url().default("http://localhost:5001"),
+	DISCOVERY_CONTACT_EMAIL: z.string().email().default("support@autolayer.fi"),
+	DISCOVERY_CONTACT_URL: z.string().url().default("https://www.autolayer.fi"),
 	AGENDA_PROCESS_EVERY: z.string().default("5 seconds"),
 	AGENDA_MAX_CONCURRENCY: z.coerce.number().int().positive().default(10),
 	JOB_LOCK_LIFETIME_MS: z.coerce.number().int().positive().default(120000),
