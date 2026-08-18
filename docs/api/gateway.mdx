@@ -17,9 +17,27 @@ Management routes accept a wallet session, personal API key, or administrative o
 | `GET` | `/v1/wrappers/:id/analytics` | Aggregate requests, latency, bytes, and payments |
 | `GET` | `/v1/vault/secrets` | List secret metadata only |
 | `POST` | `/v1/vault/secrets` | Encrypt and store a new scoped credential |
+| `GET` | `/openapi.json` | Discover every enabled public USDC xWrapper through OpenAPI 3.1 |
+| `GET` | `/.well-known/x402` | Compatibility fan-out document for x402 discovery crawlers |
 
 Public traffic uses `ANY /gateway/:slug/*`. The buyer receives canonical `PAYMENT-REQUIRED` terms, retries with `PAYMENT-SIGNATURE`, and receives `PAYMENT-RESPONSE` after settlement.
 
 Slugs are generated from names and checked against PostgreSQL. A collision receives a short suffix; the backend repeats uniqueness checking transactionally and remains authoritative over UI availability hints.
+
+## Origin discovery
+
+`/openapi.json` is generated from enabled xWrappers and is the canonical contract for origin-level registration on compatible discovery services such as x402scan. Each operation includes its public gateway path, description, tags, output schema, HTTP `402` response, structured `x-payment-info`, and a non-standard `x-stellar-payment` block retaining the CAIP-2 network, SEP-41 asset, atomic amount, decimal precision, scheme, and fee-sponsorship signal.
+
+OpenAPI prices are decimal USD, while runtime x402 amounts remain integer Stellar USDC base units. AutoLayer converts the values with integer string arithmetic and seven decimal places; for example, runtime amount `10000` is advertised as `0.0010000` USD. Rows using an unknown custom SEP-41 asset are not mislabeled as USD and remain discoverable through the native AutoLayer Bazaar.
+
+Before registering an origin, audit the deployed service rather than localhost:
+
+```bash
+npx -y @agentcash/discovery@latest discover "https://core.autolayer.fi"
+npx -y @agentcash/discovery@latest check \
+  "https://core.autolayer.fi/gateway/YOUR_SLUG"
+```
+
+Registration is an external publication step. Review every discovered method, route, price, and authentication mode, then explicitly approve registration only after all critical parser and runtime probes pass.
 
 <Note>Vault plaintext is never returned after creation and is injected only into the configured upstream request after successful payment settlement.</Note>

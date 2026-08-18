@@ -17,9 +17,36 @@ import {
   wrapperPatch,
   type OwnerRequest,
 } from "../services/gateway.js";
+import {
+  buildOpenApiDocument,
+  buildWellKnownDocument,
+  listDiscoverableWrappers,
+} from "../services/openapi-discovery.js";
 
 export const gatewayRoutes: ExpressRouter = Router();
 const idSchema = z.string().uuid();
+
+gatewayRoutes.get("/openapi.json", async (_request, response, next) => {
+  try {
+    response.setHeader("cache-control", "public, max-age=30");
+    return response.json(
+      buildOpenApiDocument(await listDiscoverableWrappers()),
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+gatewayRoutes.get("/.well-known/x402", async (_request, response, next) => {
+  try {
+    response.setHeader("cache-control", "public, max-age=30");
+    return response.json(
+      buildWellKnownDocument(await listDiscoverableWrappers()),
+    );
+  } catch (error) {
+    next(error);
+  }
+});
 gatewayRoutes.get(
   "/v1/wrappers/slug",
   requireGatewayOwner,
