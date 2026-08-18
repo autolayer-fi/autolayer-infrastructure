@@ -7,6 +7,8 @@ xWrapper is the AutoLayer Gateway feature. A seller supplies an HTTPS upstream, 
 
 The Console deploys persistent wrappers through a wallet-authenticated user session. Each enabled wrapper receives a public `/gateway/:slug` endpoint and is indexed in the Stellar Bazaar. Users can create personal API keys for SDK, agent, and CI access; those credentials are displayed once and stored only as hashes.
 
+Enabled Stellar USDC wrappers are also published through the dynamic `/openapi.json` origin contract and `/.well-known/x402` compatibility document. This lets third-party discovery services fan out from one AutoLayer origin, probe each route's authoritative runtime `402`, and index every conformant resource without receiving seller credentials or private upstream configuration.
+
 <Warning>
   Use `XWRAPPER_API_KEYS` only for administrative or self-hosted operator
   access. It must never be distributed to console users. Use a production

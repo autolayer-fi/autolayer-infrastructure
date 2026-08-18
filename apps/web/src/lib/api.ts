@@ -283,6 +283,7 @@ export interface GatewayWrapper {
   name: string;
   description: string;
   upstreamUrl: string;
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   network: "stellar:testnet" | "stellar:pubnet";
   asset: string;
   amount: string;
