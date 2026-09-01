@@ -12,3 +12,5 @@ Status: evidence template; do not mark complete without the linked artifacts.
 | `/supported` snapshot with sponsored fees | PENDING | PENDING |
 
 Attach package versions, git commit, deployment URL, timestamp, stock-client command, raw redacted transcript, transaction explorer links, and `EXTENSION-RESPONSES` decoding. Every negative fixture must assert a non-null machine-readable reason.
+
+When updating this document, prefer non-workflow edits in the main feature branch and keep workflow-file changes on a separate branch until credentials with `workflow` scope are available.
