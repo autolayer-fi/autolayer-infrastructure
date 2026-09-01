@@ -108,6 +108,11 @@ pnpm build:sdk
 pnpm lint
 pnpm migrate
 pnpm start
+
+### Contribution workflow
+
+Prefer small non-workflow commits first (docs, comments, tests, and code cleanup), then push these immediately.
+When a change only modifies `.github/workflows/*`, keep it on a dedicated branch to avoid blocking normal CI-safe pushes.
 ```
 
 ## Web deployment
