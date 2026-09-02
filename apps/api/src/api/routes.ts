@@ -62,13 +62,18 @@ export const routes: ExpressRouter = Router();
 function discoveryFilters(query: Record<string, unknown>) {
   const number = (value: unknown, fallback: number, max: number) =>
     Math.min(Math.max(Number(value) || fallback, 0), max);
+  const extensions =
+    typeof query.extensions === "string"
+      ? query.extensions
+      : Array.isArray(query.extensions)
+        ? query.extensions.flatMap(value => typeof value === "string" ? value.split(",") : []).join(",")
+        : undefined;
   return {
     type: typeof query.type === "string" ? query.type : undefined,
     payTo: typeof query.payTo === "string" ? query.payTo : undefined,
     scheme: typeof query.scheme === "string" ? query.scheme : undefined,
     network: typeof query.network === "string" ? query.network : undefined,
-    extensions:
-      typeof query.extensions === "string" ? query.extensions : undefined,
+    extensions,
     limit: number(query.limit, 20, 100),
     offset: number(query.offset, 0, 1_000_000),
   };
