@@ -99,7 +99,12 @@ function clauses(filters: Filters, start = 1) {
   if (filters.payTo) add("accepts @> ?::jsonb", JSON.stringify([{ payTo: filters.payTo }]));
   if (filters.scheme) add("accepts @> ?::jsonb", JSON.stringify([{ scheme: filters.scheme }]));
   if (filters.network) add("accepts @> ?::jsonb", JSON.stringify([{ network: filters.network }]));
-  if (filters.extensions) add("jsonb_exists(extensions, ?)", filters.extensions);
+  if (filters.extensions) {
+    const extensions = filters.extensions.split(",").map(value => value.trim()).filter(Boolean);
+    for (const extension of extensions) {
+      add("jsonb_exists(extensions, ?)", extension);
+    }
+  }
   return { where: sql.length ? `WHERE ${sql.join(" AND ")}` : "", values };
 }
 function publicResource(row: Record<string, unknown>) { return { resource: row.resource_url, type: row.resource_type, x402Version: row.x402_version, accepts: row.accepts, lastUpdated: Math.floor(new Date(row.last_updated as string).getTime() / 1000), description: row.description ?? undefined, mimeType: row.mime_type ?? undefined, serviceName: row.service_name ?? undefined, tags: row.tags, extensions: row.extensions }; }
